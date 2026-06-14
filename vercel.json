@@ -1,0 +1,23 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "description": "Your Supabase project URL"
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Your Supabase anonymous key"
+    },
+    "NEXT_PUBLIC_APP_NAME": {
+      "description": "Application name",
+      "default": "SMART POS"
+    },
+    "NEXT_PUBLIC_SHOP_NAME": {
+      "description": "Shop name for receipts",
+      "default": "Your Shop Name"
+    }
+  }
+}
