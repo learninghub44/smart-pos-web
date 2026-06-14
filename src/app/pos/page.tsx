@@ -733,6 +733,7 @@ export default function POSPage() {
 
             <Receipt
               sale={completedSale}
+              items={completedSale.items}
               shopName="SMART POS"
               cashierName={user?.name || 'Cashier'}
             />
@@ -761,15 +762,33 @@ export default function POSPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 overflow-hidden flex flex-col">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search products by name or barcode..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+          <div className="flex space-x-2 mb-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search products by name or barcode..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              onClick={() => setShowScanner(true)}
+              className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+              title="USB Scanner Input"
+            >
+              <Camera className="h-5 w-5" />
+              <span className="hidden md:inline">Scan</span>
+            </button>
+            <button
+              onClick={() => setShowCameraScanner(true)}
+              className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+              title="Camera Scanner"
+            >
+              <Camera className="h-5 w-5" />
+              <span className="hidden md:inline">Camera</span>
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
