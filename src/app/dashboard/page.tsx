@@ -23,7 +23,14 @@ export default function DashboardPage() {
     totalProducts: 0,
     lowStockItems: 0,
     outOfStockItems: 0,
-    averageTransactionValue: 0
+    averageTransactionValue: 0,
+    todaySalesChange: 0,
+    todayRevenueChange: 0,
+    todayProfitChange: 0,
+    weeklyRevenueChange: 0,
+    monthlyRevenueChange: 0,
+    yearlyRevenueChange: 0,
+    totalProductsChange: 0
   })
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [topProducts, setTopProducts] = useState<any[]>([])
@@ -48,14 +55,26 @@ export default function DashboardPage() {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+      
       const weekAgo = new Date(today)
       weekAgo.setDate(weekAgo.getDate() - 7)
+      
+      const lastWeekStart = new Date(weekAgo)
+      lastWeekStart.setDate(lastWeekStart.getDate() - 7)
       
       const monthAgo = new Date(today)
       monthAgo.setMonth(monthAgo.getMonth() - 1)
       
+      const lastMonthStart = new Date(monthAgo)
+      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1)
+      
       const yearAgo = new Date(today)
       yearAgo.setFullYear(yearAgo.getFullYear() - 1)
+      
+      const lastYearStart = new Date(yearAgo)
+      lastYearStart.setFullYear(lastYearStart.getFullYear() - 1)
       
       // Get sales data
       const { data: salesData, error: salesError } = await supabase
@@ -73,17 +92,26 @@ export default function DashboardPage() {
       if (!salesError && salesData && !productsError && productsData) {
         // Calculate stats
         const todaySales = salesData.filter(s => new Date(s.created_at) >= today)
+        const yesterdaySales = salesData.filter(s => new Date(s.created_at) >= yesterday && new Date(s.created_at) < today)
         const weeklySales = salesData.filter(s => new Date(s.created_at) >= weekAgo)
+        const lastWeekSales = salesData.filter(s => new Date(s.created_at) >= lastWeekStart && new Date(s.created_at) < weekAgo)
         const monthlySales = salesData.filter(s => new Date(s.created_at) >= monthAgo)
+        const lastMonthSales = salesData.filter(s => new Date(s.created_at) >= lastMonthStart && new Date(s.created_at) < monthAgo)
         const yearlySales = salesData
+        const lastYearSales = salesData.filter(s => new Date(s.created_at) >= lastYearStart && new Date(s.created_at) < yearAgo)
         
         const todayRevenue = todaySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
+        const yesterdayRevenue = yesterdaySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
         const weeklyRevenue = weeklySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
+        const lastWeekRevenue = lastWeekSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
         const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
+        const lastMonthRevenue = lastMonthSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
         const yearlyRevenue = yearlySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
+        const lastYearRevenue = lastYearSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
         
         // Calculate profit (revenue - cost)
         let todayCost = 0
+        let yesterdayCost = 0
         todaySales.forEach(sale => {
           sale.sale_items?.forEach((item: any) => {
             if (item.products) {
@@ -91,7 +119,15 @@ export default function DashboardPage() {
             }
           })
         })
+        yesterdaySales.forEach(sale => {
+          sale.sale_items?.forEach((item: any) => {
+            if (item.products) {
+              yesterdayCost += (item.products.cost_price || 0) * item.quantity
+            }
+          })
+        })
         const todayProfit = todayRevenue - todayCost
+        const yesterdayProfit = yesterdayRevenue - yesterdayCost
         
         const totalProducts = productsData.length
         const lowStockItems = productsData.filter(p => p.stock > 0 && p.stock < 10).length
@@ -128,6 +164,33 @@ export default function DashboardPage() {
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 5)
         
+        // Calculate percentage changes
+        const todaySalesChange = yesterdaySales.length > 0 
+          ? ((todaySales.length - yesterdaySales.length) / yesterdaySales.length) * 100 
+          : 0
+        
+        const todayRevenueChange = yesterdayRevenue > 0 
+          ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
+          : 0
+        
+        const todayProfitChange = yesterdayProfit > 0 
+          ? ((todayProfit - yesterdayProfit) / yesterdayProfit) * 100 
+          : 0
+        
+        const weeklyRevenueChange = lastWeekRevenue > 0 
+          ? ((weeklyRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 
+          : 0
+        
+        const monthlyRevenueChange = lastMonthRevenue > 0 
+          ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
+          : 0
+        
+        const yearlyRevenueChange = lastYearRevenue > 0 
+          ? ((yearlyRevenue - lastYearRevenue) / lastYearRevenue) * 100 
+          : 0
+        
+        const totalProductsChange = 0 // Products don't change much, can be calculated if needed
+        
         setStats({
           todaySales: todaySales.length,
           todayRevenue,
@@ -138,7 +201,14 @@ export default function DashboardPage() {
           totalProducts,
           lowStockItems,
           outOfStockItems,
-          averageTransactionValue
+          averageTransactionValue,
+          todaySalesChange,
+          todayRevenueChange,
+          todayProfitChange,
+          weeklyRevenueChange,
+          monthlyRevenueChange,
+          yearlyRevenueChange,
+          totalProductsChange
         })
         setRecentTransactions(recent)
         setTopProducts(topProductsArray)
@@ -157,56 +227,56 @@ export default function DashboardPage() {
       value: stats.todaySales,
       icon: ShoppingCart,
       color: 'blue',
-      change: '+12%'
+      change: stats.todaySalesChange >= 0 ? `+${stats.todaySalesChange.toFixed(1)}%` : `${stats.todaySalesChange.toFixed(1)}%`
     },
     {
       title: 'Today Revenue',
       value: `KES ${stats.todayRevenue.toLocaleString()}`,
       icon: DollarSign,
       color: 'green',
-      change: '+8%'
+      change: stats.todayRevenueChange >= 0 ? `+${stats.todayRevenueChange.toFixed(1)}%` : `${stats.todayRevenueChange.toFixed(1)}%`
     },
     {
       title: 'Today Profit',
       value: `KES ${stats.todayProfit.toLocaleString()}`,
       icon: TrendingUp,
       color: 'purple',
-      change: '+15%'
+      change: stats.todayProfitChange >= 0 ? `+${stats.todayProfitChange.toFixed(1)}%` : `${stats.todayProfitChange.toFixed(1)}%`
     },
     {
       title: 'Avg Transaction',
       value: `KES ${Math.round(stats.averageTransactionValue).toLocaleString()}`,
       icon: DollarSign,
       color: 'indigo',
-      change: '+5%'
+      change: '+0%' // Average transaction doesn't have a meaningful period comparison
     },
     {
       title: 'Weekly Revenue',
       value: `KES ${stats.weeklyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: 'teal',
-      change: '+10%'
+      change: stats.weeklyRevenueChange >= 0 ? `+${stats.weeklyRevenueChange.toFixed(1)}%` : `${stats.weeklyRevenueChange.toFixed(1)}%`
     },
     {
       title: 'Monthly Revenue',
       value: `KES ${stats.monthlyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: 'emerald',
-      change: '+18%'
+      change: stats.monthlyRevenueChange >= 0 ? `+${stats.monthlyRevenueChange.toFixed(1)}%` : `${stats.monthlyRevenueChange.toFixed(1)}%`
     },
     {
       title: 'Yearly Revenue',
       value: `KES ${stats.yearlyRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: 'cyan',
-      change: '+22%'
+      change: stats.yearlyRevenueChange >= 0 ? `+${stats.yearlyRevenueChange.toFixed(1)}%` : `${stats.yearlyRevenueChange.toFixed(1)}%`
     },
     {
       title: 'Total Products',
       value: stats.totalProducts,
       icon: Package,
       color: 'orange',
-      change: '+5%'
+      change: '+0%' // Products don't change much, can be calculated if needed
     }
   ]
 
