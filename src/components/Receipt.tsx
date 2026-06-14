@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState } from 'react'
 import { useReactToPrint } from 'react-to-print'
-import { Printer } from 'lucide-react'
+import { Printer, Printer as PrinterIcon, Wifi, Usb } from 'lucide-react'
+import ThermalPrinter from '@/lib/thermalPrinter'
 
 interface ReceiptProps {
   sale: any
@@ -27,6 +28,9 @@ export default function Receipt({
 }: ReceiptProps) {
   const receiptRef = useRef<HTMLDivElement>(null)
   const [settings, setSettings] = useState<any>(null)
+  const [thermalPrinter, setThermalPrinter] = useState<ThermalPrinter | null>(null)
+  const [printerConnected, setPrinterConnected] = useState(false)
+  const [showPrinterOptions, setShowPrinterOptions] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -46,6 +50,71 @@ export default function Receipt({
       }
     } catch (error) {
       console.log('Error loading settings')
+    }
+  }
+
+  const connectUSBPrinter = async () => {
+    const printer = new ThermalPrinter()
+    const connected = await printer.connectUSB()
+    if (connected) {
+      setThermalPrinter(printer)
+      setPrinterConnected(true)
+      setShowPrinterOptions(false)
+    } else {
+      alert('Failed to connect to USB printer')
+    }
+  }
+
+  const connectBluetoothPrinter = async () => {
+    const printer = new ThermalPrinter()
+    const connected = await printer.connectBluetooth()
+    if (connected) {
+      setThermalPrinter(printer)
+      setPrinterConnected(true)
+      setShowPrinterOptions(false)
+    } else {
+      alert('Failed to connect to Bluetooth printer')
+    }
+  }
+
+  const printWithThermalPrinter = async () => {
+    if (!thermalPrinter || !printerConnected) {
+      alert('No thermal printer connected')
+      return
+    }
+
+    const receiptData = {
+      shopName: businessName,
+      shopAddress: businessAddress,
+      shopPhone: businessPhone,
+      receiptPin: sale.receipt_pin,
+      receiptNumber: sale.receipt_number,
+      created_at: sale.created_at,
+      cashierName: cashierName,
+      payment_method: sale.payment_method,
+      total_amount: sale.total_amount,
+      discount_amount: sale.discount_amount,
+      cash_amount: sale.cash_amount,
+      mpesa_amount: sale.mpesa_amount,
+      card_amount: sale.card_amount,
+      bank_amount: sale.bank_amount,
+      notes: sale.notes,
+      receiptFooter: footerText
+    }
+
+    const success = await thermalPrinter.printReceipt(receiptData, items)
+    if (success) {
+      alert('Receipt printed successfully')
+    } else {
+      alert('Failed to print receipt')
+    }
+  }
+
+  const disconnectPrinter = async () => {
+    if (thermalPrinter) {
+      await thermalPrinter.disconnect()
+      setThermalPrinter(null)
+      setPrinterConnected(false)
     }
   }
 
@@ -89,15 +158,68 @@ export default function Receipt({
 
   return (
     <div className="space-y-4">
-      <div className="flex space-x-2">
-        <button
-          onClick={handlePrint}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          <Printer className="h-4 w-4" />
-          <span>Print Receipt</span>
-        </button>
+      <div className="flex flex-wrap gap-2">
+        {printerConnected ? (
+          <>
+            <button
+              onClick={printWithThermalPrinter}
+              className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Print Thermal</span>
+            </button>
+            <button
+              onClick={disconnectPrinter}
+              className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              <span>Disconnect</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handlePrint}
+              className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Print (Browser)</span>
+            </button>
+            <button
+              onClick={() => setShowPrinterOptions(!showPrinterOptions)}
+              className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              <span>Connect Thermal</span>
+            </button>
+          </>
+        )}
       </div>
+
+      {showPrinterOptions && (
+        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+          <p className="font-medium">Connect Thermal Printer:</p>
+          <div className="flex gap-2">
+            <button
+              onClick={connectUSBPrinter}
+              className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              <Usb className="h-4 w-4" />
+              <span>USB Printer</span>
+            </button>
+            <button
+              onClick={connectBluetoothPrinter}
+              className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+            >
+              <Wifi className="h-4 w-4" />
+              <span>Bluetooth Printer</span>
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">
+            Note: WebUSB and WebBluetooth require HTTPS and browser support
+          </p>
+        </div>
+      )}
 
       <div
         ref={receiptRef}
