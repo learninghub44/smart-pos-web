@@ -41,8 +41,8 @@ export default function DashboardPage() {
     loadStats()
   }, [])
 
-  const loadUserData = async () => {
-    const currentUser = await getCurrentAuthUser()
+  const loadUserData = () => {
+    const currentUser = getCurrentAuthUser()
     setUser(currentUser)
   }
 

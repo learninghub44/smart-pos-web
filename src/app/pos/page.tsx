@@ -61,7 +61,7 @@ export default function POSPage() {
   }
 
   async function loadUser() {
-    const u = await getCurrentAuthUser()
+    const u = getCurrentAuthUser()
     setUser(u)
   }
 

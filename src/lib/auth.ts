@@ -1,5 +1,6 @@
-import { supabase } from './supabase'
-import { addUserToDB, getCurrentUser, clearCurrentUser } from './indexeddb'
+// Auth uses sessionStorage to track the current logged-in user.
+// User lookup and password verification is done against Supabase.
+// IndexedDB stores user records for offline fallback.
 
 export interface User {
   id: string
@@ -8,7 +9,8 @@ export interface User {
   role: 'admin' | 'cashier'
 }
 
-// SHA-256 password hashing (matches server-side registration)
+const SESSION_KEY = 'smartpos_user'
+
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(password)
@@ -17,111 +19,83 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password)
-  return passwordHash === hash
-}
-
 export async function login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    // Try Supabase authentication first
+    const { supabase } = await import('./supabase')
+
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .eq('email', email.trim().toLowerCase())
       .single()
-    
-    if (userError) {
-      console.error('User lookup error:', userError)
-    }
-    
-    if (userData) {
-      // Verify password hash
-      const isValid = await verifyPassword(password, userData.password_hash)
-      
-      if (isValid) {
-        const user: User = {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-          role: userData.role
-        }
-        
-        // Store in IndexedDB for offline access
-        await addUserToDB(user)
-        
-        return { success: true, user }
-      } else {
-        return { success: false, error: 'Invalid credentials' }
-      }
-    }
-    
-    return { success: false, error: 'Invalid credentials' }
-  } catch (error) {
-    console.error('Login error:', error)
-    return { success: false, error: 'Login failed. Please try again.' }
-  }
-}
 
-export async function register(name: string, email: string, password: string, role: 'admin' | 'cashier'): Promise<{ success: boolean; user?: User; error?: string }> {
-  try {
-    // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('email')
-      .eq('email', email)
-      .single()
-    
-    if (existingUser) {
-      return { success: false, error: 'User already exists' }
+    if (userError || !userData) {
+      // Also try without lowercasing in case email was stored differently
+      const { data: userData2 } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email.trim())
+        .single()
+
+      if (!userData2) {
+        return { success: false, error: 'No account found with this email.' }
+      }
+
+      const isValid = await hashPassword(password).then(h => h === userData2.password_hash)
+      if (!isValid) return { success: false, error: 'Incorrect password.' }
+
+      const user: User = { id: userData2.id, name: userData2.name, email: userData2.email, role: userData2.role }
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
+      return { success: true, user }
     }
-    
-    // Hash password
+
     const passwordHash = await hashPassword(password)
-    
-    // Create user
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      .insert({
-        name,
-        email,
-        password_hash: passwordHash,
-        role
-      })
-      .select()
-      .single()
-    
-    if (createError || !newUser) {
-      return { success: false, error: 'Failed to create user' }
+    if (passwordHash !== userData.password_hash) {
+      return { success: false, error: 'Incorrect password.' }
     }
-    
-    const user: User = {
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role
-    }
-    
+
+    const user: User = { id: userData.id, name: userData.name, email: userData.email, role: userData.role }
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
+
+    // Cache in IndexedDB for offline use
+    try {
+      const { storeCurrentUser } = await import('./indexeddb')
+      await storeCurrentUser(user)
+    } catch (_) {}
+
     return { success: true, user }
-  } catch (error) {
-    console.error('Registration error:', error)
-    return { success: false, error: 'Registration failed. Please try again.' }
+
+  } catch (error: any) {
+    console.error('Login error:', error)
+
+    // Offline fallback — check IndexedDB
+    try {
+      const { getCachedUser } = await import('./indexeddb')
+      const cachedUser = await getCachedUser(email.trim())
+      if (cachedUser) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(cachedUser))
+        return { success: true, user: cachedUser }
+      }
+    } catch (_) {}
+
+    return { success: false, error: 'Could not connect. Check your internet connection.' }
   }
 }
 
 export async function logout(): Promise<void> {
-  await clearCurrentUser()
-  // In production, also call Supabase auth logout if using Supabase Auth
+  sessionStorage.removeItem(SESSION_KEY)
+  try {
+    const { clearCurrentUser } = await import('./indexeddb')
+    await clearCurrentUser()
+  } catch (_) {}
 }
 
-export async function getCurrentAuthUser(): Promise<User | null> {
-  // Try to get from IndexedDB first (offline support)
-  const localUser = await getCurrentUser()
-  if (localUser) {
-    return localUser
-  }
-  
-  // If no local user, return null
+export function getCurrentAuthUser(): User | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY)
+    if (stored) return JSON.parse(stored) as User
+  } catch (_) {}
   return null
 }
 
@@ -135,11 +109,28 @@ export function isCashier(user: User | null): boolean {
 
 export function hasPermission(user: User | null, permission: string): boolean {
   if (!user) return false
-  
-  // Admin has all permissions
   if (user.role === 'admin') return true
-  
-  // Cashier permissions
-  const cashierPermissions = ['pos', 'sales_history', 'profile']
+  const cashierPermissions = ['pos', 'sales_history', 'receipts', 'customers']
   return cashierPermissions.includes(permission)
+}
+
+// Helper for creating users (run once from admin)
+export async function register(name: string, email: string, password: string, role: 'admin' | 'cashier'): Promise<{ success: boolean; user?: User; error?: string }> {
+  try {
+    const { supabase } = await import('./supabase')
+    const passwordHash = await hashPassword(password)
+
+    const { data: newUser, error } = await supabase
+      .from('users')
+      .insert({ name, email: email.trim().toLowerCase(), password_hash: passwordHash, role })
+      .select()
+      .single()
+
+    if (error || !newUser) return { success: false, error: error?.message || 'Failed to create user' }
+
+    const user: User = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }
+    return { success: true, user }
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Registration failed' }
+  }
 }

@@ -47,17 +47,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, [pathname])
-
-  const checkAuth = async () => {
-    const currentUser = await getCurrentAuthUser()
+    const currentUser = getCurrentAuthUser()
     if (!currentUser && pathname !== '/login') {
       router.push('/login')
     } else {
       setUser(currentUser)
     }
-  }
+  }, [pathname])
 
   const handleLogout = async () => {
     await logout()

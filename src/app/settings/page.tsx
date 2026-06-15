@@ -33,8 +33,8 @@ export default function SettingsPage() {
     loadSettings()
   }, [])
 
-  const loadUser = async () => {
-    const currentUser = await getCurrentAuthUser()
+  const loadUser = () => {
+    const currentUser = getCurrentAuthUser()
     setUser(currentUser)
   }
 

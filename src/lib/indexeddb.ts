@@ -654,7 +654,21 @@ export async function getAllAuditLogs() {
 // User operations
 export async function addUserToDB(user: any) {
   const db = await getDB()
-  return db.add('users', user)
+  return db.put('users', user)  // put = upsert, safe to call multiple times
+}
+
+// Store the currently logged-in user for offline fallback
+export async function storeCurrentUser(user: any) {
+  const db = await getDB()
+  await db.clear('users')
+  return db.put('users', user)
+}
+
+// Get a cached user by email for offline login
+export async function getCachedUser(email: string) {
+  const db = await getDB()
+  const users = await db.getAll('users')
+  return users.find((u: any) => u.email === email) || null
 }
 
 export async function getCurrentUser() {
