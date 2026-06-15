@@ -40,22 +40,25 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data } = await supabase.from('settings').select('*')
+      if (data && data.length > 0) {
+        data.forEach((s: any) => {
+          if (s.key === 'business') setBusinessSettings(s.value)
+          if (s.key === 'receipt') setReceiptSettings(s.value)
+          if (s.key === 'tax') setTaxSettings(s.value)
+        })
+        return
+      }
+    } catch (_) {}
+    try {
       const { getSettingByKey } = await import('@/lib/indexeddb')
-      
       const business = await getSettingByKey('business')
-      if (business) {
-        setBusinessSettings(business.value)
-      }
-      
+      if (business) setBusinessSettings(business.value)
       const receipt = await getSettingByKey('receipt')
-      if (receipt) {
-        setReceiptSettings(receipt.value)
-      }
-      
+      if (receipt) setReceiptSettings(receipt.value)
       const tax = await getSettingByKey('tax')
-      if (tax) {
-        setTaxSettings(tax.value)
-      }
+      if (tax) setTaxSettings(tax.value)
     } catch (error) {
       console.log('Error loading settings')
     }
