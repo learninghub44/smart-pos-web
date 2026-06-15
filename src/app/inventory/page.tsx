@@ -1,28 +1,58 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Search, Plus, Edit, Trash2, Package, AlertCircle, Camera } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Search, Plus, Edit, Trash2, Package, AlertCircle, Camera, Barcode, RefreshCw, X, Download } from 'lucide-react'
 import { getAllProducts, addProductToDB, updateProductInDB, deleteProductFromDB, getProductByBarcode } from '@/lib/indexeddb'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
 interface Product {
-  id: string
-  name: string
-  sku: string | null
-  barcode: string
-  category_id: string | null
-  brand_id: string | null
-  unit: string | null
-  cost_price: number
-  selling_price: number
-  tax_rate: number
-  stock: number
-  minimum_stock: number
-  image_url: string | null
-  archived: boolean
-  created_at: string
-  updated_at: string
+  id: string; name: string; sku: string | null; barcode: string
+  category_id: string | null; brand_id: string | null; unit: string | null
+  cost_price: number; selling_price: number; tax_rate: number
+  stock: number; minimum_stock: number; image_url: string | null
+  archived: boolean; created_at: string; updated_at: string
+}
+
+// Generate EAN13-style barcode number
+function generateBarcode(): string {
+  const prefix = '6' // East Africa region prefix
+  const num = prefix + Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('')
+  // Calculate check digit
+  let sum = 0
+  for (let i = 0; i < 12; i++) sum += parseInt(num[i]) * (i % 2 === 0 ? 1 : 3)
+  const check = (10 - (sum % 10)) % 10
+  return num + check
+}
+
+// SVG barcode renderer (Code128 simplified)
+function BarcodeDisplay({ value, width = 200, height = 60 }: { value: string; width?: number; height?: number }) {
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  useEffect(() => {
+    if (!svgRef.current || !value) return
+    try {
+      import('jsbarcode').then(({ default: JsBarcode }) => {
+        JsBarcode(svgRef.current, value, {
+          format: 'EAN13',
+          width: 1.5,
+          height: height - 20,
+          displayValue: true,
+          fontSize: 11,
+          margin: 4,
+          background: '#ffffff',
+          lineColor: '#000000'
+        })
+      }).catch(() => {
+        // Fallback: show text barcode
+        if (svgRef.current) {
+          svgRef.current.innerHTML = `<text x="50%" y="50%" text-anchor="middle" font-family="monospace" font-size="12">${value}</text>`
+        }
+      })
+    } catch (_) {}
+  }, [value, height])
+
+  return <svg ref={svgRef} width={width} height={height} />
 }
 
 export default function InventoryPage() {
@@ -31,521 +61,347 @@ export default function InventoryPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [showCameraScanner, setShowCameraScanner] = useState(false)
+  const [showBarcodeModal, setShowBarcodeModal] = useState<Product | null>(null)
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
-    name: '',
-    sku: '',
-    barcode: '',
-    category_id: '',
-    brand_id: '',
-    unit: '',
-    cost_price: '',
-    selling_price: '',
-    tax_rate: '',
-    stock: '',
-    minimum_stock: ''
+    name: '', sku: '', barcode: '', unit: '',
+    cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: ''
   })
 
-  useEffect(() => {
-    loadProducts()
-  }, [])
+  useEffect(() => { loadProducts() }, [])
 
   const handleBarcodeScan = async (barcode: string) => {
-    // Check if product already exists with this barcode
-    const existingProduct = await getProductByBarcode(barcode)
-    if (existingProduct) {
-      alert(`Product already exists with this barcode: ${existingProduct.name}`)
-      return
-    }
-    
-    // Auto-fill the barcode field
     setFormData(prev => ({ ...prev, barcode }))
     setShowCameraScanner(false)
   }
 
-  // USB barcode scanner integration
-  useBarcodeScanner({
-    onScan: handleBarcodeScan,
-    enabled: showModal && !showCameraScanner
-  })
+  useBarcodeScanner({ onScan: handleBarcodeScan, enabled: showModal && !showCameraScanner })
 
   const loadProducts = async () => {
-    // Try to load from Supabase first, fall back to IndexedDB
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
+      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
       if (data && !error) {
         setProducts(data)
-        // Also cache in IndexedDB for offline use
-        for (const product of data) {
-          await updateProductInDB(product)
-        }
+        for (const p of data) await updateProductInDB(p)
         return
       }
-    } catch (error) {
-      console.log('Supabase not available, using IndexedDB')
-    }
-    
-    // Fall back to IndexedDB
-    const allProducts = await getAllProducts()
-    setProducts(allProducts)
+    } catch (_) {}
+    const local = await getAllProducts()
+    setProducts(local)
   }
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.barcode.includes(searchTerm)
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.barcode || '').includes(searchTerm) ||
+    (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddProduct = () => {
+  const openAdd = () => {
     setEditingProduct(null)
+    setFormData({ name: '', sku: '', barcode: generateBarcode(), unit: '', cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: '' })
+    setShowModal(true)
+  }
+
+  const openEdit = (p: Product) => {
+    setEditingProduct(p)
     setFormData({
-      name: '',
-      sku: '',
-      barcode: '',
-      category_id: '',
-      brand_id: '',
-      unit: '',
-      cost_price: '',
-      selling_price: '',
-      tax_rate: '',
-      stock: '',
-      minimum_stock: ''
+      name: p.name, sku: p.sku || '', barcode: p.barcode, unit: p.unit || '',
+      cost_price: p.cost_price.toString(), selling_price: p.selling_price.toString(),
+      tax_rate: p.tax_rate.toString(), stock: p.stock.toString(),
+      minimum_stock: p.minimum_stock.toString()
     })
     setShowModal(true)
   }
 
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product)
-    setFormData({
-      name: product.name,
-      sku: product.sku || '',
-      barcode: product.barcode,
-      category_id: product.category_id || '',
-      brand_id: product.brand_id || '',
-      unit: product.unit || '',
-      cost_price: product.cost_price.toString(),
-      selling_price: product.selling_price.toString(),
-      tax_rate: product.tax_rate.toString(),
-      stock: product.stock.toString(),
-      minimum_stock: product.minimum_stock.toString()
-    })
-    setShowModal(true)
-  }
-
-  const handleDeleteProduct = async (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      try {
-        const { supabase } = await import('@/lib/supabase')
-        const { error } = await supabase
-          .from('products')
-          .delete()
-          .eq('id', id)
-        
-        if (!error) {
-          await deleteProductFromDB(id)
-        }
-      } catch (error) {
-        console.log('Supabase not available, using IndexedDB only')
-        await deleteProductFromDB(id)
-      }
-      loadProducts()
-    }
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this product?')) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('products').delete().eq('id', id)
+    } catch (_) {}
+    await deleteProductFromDB(id)
+    loadProducts()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    const productData = {
-      name: formData.name,
-      sku: formData.sku || null,
-      barcode: formData.barcode,
-      category_id: formData.category_id || null,
-      brand_id: formData.brand_id || null,
-      unit: formData.unit || null,
+    setSaving(true)
+    const data = {
+      name: formData.name, sku: formData.sku || null, barcode: formData.barcode,
+      unit: formData.unit || null, category_id: null, brand_id: null,
       cost_price: parseFloat(formData.cost_price),
       selling_price: parseFloat(formData.selling_price),
       tax_rate: parseFloat(formData.tax_rate) || 0,
-      stock: parseInt(formData.stock),
-      minimum_stock: parseInt(formData.minimum_stock) || 0,
-      image_url: null,
-      archived: false,
-      created_at: new Date().toISOString(),
+      stock: parseInt(formData.stock), minimum_stock: parseInt(formData.minimum_stock) || 0,
+      image_url: null, archived: false,
+      created_at: editingProduct?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
-
     try {
       const { supabase } = await import('@/lib/supabase')
-      
       if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update({ ...productData, id: editingProduct.id })
-          .eq('id', editingProduct.id)
-        
-        if (!error) {
-          await updateProductInDB({ ...productData, id: editingProduct.id })
-        }
+        await supabase.from('products').update(data).eq('id', editingProduct.id)
+        await updateProductInDB({ ...data, id: editingProduct.id })
       } else {
-        const newId = crypto.randomUUID()
-        const { error } = await supabase
-          .from('products')
-          .insert({ ...productData, id: newId })
-        
-        if (!error) {
-          await addProductToDB({ ...productData, id: newId })
-        }
+        const id = crypto.randomUUID()
+        await supabase.from('products').insert({ ...data, id })
+        await addProductToDB({ ...data, id })
       }
-    } catch (error) {
-      console.log('Supabase not available, using IndexedDB only')
+    } catch (_) {
       if (editingProduct) {
-        await updateProductInDB({ ...productData, id: editingProduct.id })
+        await updateProductInDB({ ...data, id: editingProduct.id })
       } else {
-        await addProductToDB({ ...productData, id: crypto.randomUUID() })
+        await addProductToDB({ ...data, id: crypto.randomUUID() })
       }
     }
-
+    setSaving(false)
     setShowModal(false)
     loadProducts()
   }
 
-  const lowStockProducts = products.filter(p => p.stock < 10)
+  const lowStock = products.filter(p => p.stock < (p.minimum_stock || 10) && !p.archived)
 
   return (
     <>
-      <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-gray-600 mt-1">Manage your products and stock</p>
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{products.length} products</p>
+          </div>
+          <button onClick={openAdd}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 text-sm font-medium shadow-sm">
+            <Plus className="w-4 h-4" /> Add Product
+          </button>
         </div>
-        <button
-          onClick={handleAddProduct}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Product</span>
-        </button>
+
+        {/* Low Stock Alert */}
+        {lowStock.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-900 text-sm">Low Stock Alert</p>
+              <p className="text-amber-700 text-sm">{lowStock.map(p => p.name).join(', ')}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input type="text" placeholder="Search name, barcode, SKU..."
+            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Product</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Barcode</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Cost</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Price</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-600">Stock</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-14 text-gray-400">
+                      <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p>{searchTerm ? 'No products match your search' : 'No products yet. Add your first product.'}</p>
+                    </td>
+                  </tr>
+                ) : filteredProducts.map(p => (
+                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{p.name}</div>
+                      {p.sku && <div className="text-xs text-gray-400">{p.sku}</div>}
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <button onClick={() => setShowBarcodeModal(p)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-mono">
+                        <Barcode className="w-3.5 h-3.5" />
+                        {p.barcode || '—'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-right hidden md:table-cell text-gray-500">
+                      KES {Number(p.cost_price).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                      KES {Number(p.selling_price).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        p.stock <= 0 ? 'bg-red-100 text-red-700'
+                        : p.stock < (p.minimum_stock || 10) ? 'bg-amber-100 text-amber-700'
+                        : 'bg-green-100 text-green-700'
+                      }`}>
+                        {p.stock <= 0 ? 'Out' : p.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => setShowBarcodeModal(p)} className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg sm:hidden">
+                          <Barcode className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => openEdit(p)} className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(p.id)} className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      {/* Low Stock Alert */}
-      {lowStockProducts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="flex items-center space-x-3">
-            <AlertCircle className="h-6 w-6 text-red-600" />
-            <div>
-              <h3 className="font-semibold text-red-900">Low Stock Alert</h3>
-              <p className="text-red-700 text-sm">
-                {lowStockProducts.length} products are running low on stock
-              </p>
+      {/* Barcode modal */}
+      {showBarcodeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900">Barcode</h3>
+              <button onClick={() => setShowBarcodeModal(null)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4 font-medium">{showBarcodeModal.name}</p>
+            <div className="flex justify-center bg-white border border-gray-200 rounded-xl p-4 mb-4">
+              <BarcodeDisplay value={showBarcodeModal.barcode} width={220} height={80} />
+            </div>
+            <p className="text-center text-xs text-gray-400 font-mono mb-4">{showBarcodeModal.barcode}</p>
+            <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
+              <Download className="w-4 h-4" /> Print Barcode
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+              <h2 className="font-bold text-gray-900 text-lg">{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
+              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-5 py-4">
+              <form onSubmit={handleSubmit} className="space-y-4" id="product-form">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Product Name *</label>
+                  <input required type="text" value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Coca Cola 500ml" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">SKU</label>
+                    <input type="text" value={formData.sku}
+                      onChange={e => setFormData({ ...formData, sku: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Optional" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Unit</label>
+                    <input type="text" value={formData.unit}
+                      onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="pcs, kg, L" />
+                  </div>
+                </div>
+
+                {/* Barcode */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Barcode *</label>
+                  <div className="flex gap-2">
+                    <input required type="text" value={formData.barcode}
+                      onChange={e => setFormData({ ...formData, barcode: e.target.value })}
+                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Scan or enter barcode" />
+                    <button type="button" onClick={() => setFormData({ ...formData, barcode: generateBarcode() })}
+                      title="Auto-generate barcode"
+                      className="px-3 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-xs font-medium flex items-center gap-1">
+                      <RefreshCw className="w-3.5 h-3.5" /> Gen
+                    </button>
+                    <button type="button" onClick={() => setShowCameraScanner(true)}
+                      title="Scan with camera"
+                      className="px-3 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+                      <Camera className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {formData.barcode && (
+                    <div className="mt-2 p-2 bg-gray-50 rounded-xl flex justify-center">
+                      <BarcodeDisplay value={formData.barcode} width={180} height={55} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Cost Price (KES) *</label>
+                    <input required type="number" step="0.01" min="0" value={formData.cost_price}
+                      onChange={e => setFormData({ ...formData, cost_price: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Selling Price (KES) *</label>
+                    <input required type="number" step="0.01" min="0" value={formData.selling_price}
+                      onChange={e => setFormData({ ...formData, selling_price: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Stock Qty *</label>
+                    <input required type="number" min="0" value={formData.stock}
+                      onChange={e => setFormData({ ...formData, stock: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Min Stock</label>
+                    <input type="number" min="0" value={formData.minimum_stock}
+                      onChange={e => setFormData({ ...formData, minimum_stock: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="px-5 py-4 border-t flex gap-3 flex-shrink-0">
+              <button type="button" onClick={() => setShowModal(false)}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="submit" form="product-form" disabled={saving}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Saving...' : editingProduct ? 'Update' : 'Add Product'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search products by name or barcode..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
-
-      {/* Products Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Product
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Barcode
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cost Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Selling Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Package className="h-5 w-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{product.barcode}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      KES {product.cost_price.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      KES {product.selling_price.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      product.stock < 10
-                        ? 'bg-red-100 text-red-700'
-                        : product.stock < 20
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}>
-                      {product.stock}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => handleEditProduct(product)}
-                      className="text-blue-600 hover:text-blue-700"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteProduct(product.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No products found</p>
-          </div>
-        )}
-      </div>
-
-      {/* Add/Edit Product Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">
-              {editingProduct ? 'Edit Product' : 'Add New Product'}
-            </h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Product Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SKU (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Barcode
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      required
-                      value={formData.barcode}
-                      onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Scan or enter barcode"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCameraScanner(true)}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      <Camera className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.category_id}
-                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Category ID"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Brand (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.brand_id}
-                    onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Brand ID"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., pcs, kg, liters"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cost Price (KES)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    step="0.01"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Selling Price (KES)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    step="0.01"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tax Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formData.tax_rate}
-                    onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stock Quantity
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Minimum Stock
-                </label>
-                <input
-                  type="number"
-                  value={formData.minimum_stock}
-                  onChange={(e) => setFormData({ ...formData, minimum_stock: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  {editingProduct ? 'Update' : 'Add'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {showCameraScanner && (
+        <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowCameraScanner(false)} continuous={false} />
       )}
-    </div>
-
-    {showCameraScanner && (
-      <BarcodeScanner
-        onScan={handleBarcodeScan}
-        onClose={() => setShowCameraScanner(false)}
-        continuous={false}
-        showFlashlight={true}
-      />
-    )}
     </>
   )
 }
