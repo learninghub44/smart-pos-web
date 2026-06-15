@@ -3,8 +3,8 @@ import "./globals.css";
 import Layout from "@/components/Layout";
 
 export const metadata: Metadata = {
-  title: "Smart POS",
-  description: "Point of Sale System for Kenyan Shops",
+  title: "Smart POS | Zetu Business Solutions",
+  description: "Smart POS — Point of Sale System for Kenyan Shops by Zetu Business Solutions",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

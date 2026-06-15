@@ -80,14 +80,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}>
               <ShoppingBag className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-gray-900 text-lg">Smart POS</span>
+            <div className="min-w-0">
+              <div className="font-bold text-gray-900 text-sm leading-tight">Smart POS</div>
+              <div className="text-[10px] font-medium text-blue-600 leading-tight truncate">Zetu Business Solutions</div>
+            </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600 p-1">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>

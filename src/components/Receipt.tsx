@@ -105,7 +105,7 @@ function ReceiptContent({
         <div style={{ marginTop: '4px', fontWeight: 'bold', fontSize: '11px', letterSpacing: '2px' }}>
           PIN: {sale.receipt_pin}
         </div>
-        <div style={{ marginTop: '8px', fontSize: '9px', color: '#777' }}>*** Smart POS ***</div>
+        <div style={{ marginTop: '8px', fontSize: '9px', color: '#777' }}>Powered by Zetu Business Solutions</div>
       </div>
     </div>
   )
@@ -118,7 +118,7 @@ export default function Receipt({
   shopPhone = '',
   shopEmail = '',
   cashierName = 'Cashier',
-  receiptFooter = 'Thank you for your purchase!'
+  receiptFooter = 'Thank you for shopping with us!'
 }: ReceiptProps) {
   const [settings, setSettings] = useState<any>(null)
   const [thermalPrinter, setThermalPrinter] = useState<ThermalPrinter | null>(null)
