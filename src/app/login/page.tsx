@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { login } from '@/lib/auth'
-import { Store, Lock, Mail } from 'lucide-react'
+import { Eye, EyeOff, ShoppingBag } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -18,86 +19,233 @@ export default function LoginPage() {
     setLoading(true)
 
     const result = await login(email, password)
-    
+
     if (result.success) {
       router.push('/dashboard')
     } else {
-      setError(result.error || 'Login failed')
+      setError(result.error || 'Invalid email or password')
     }
-    
+
     setLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <div className="min-h-screen flex" style={{ background: '#0f172a' }}>
+      {/* Left panel — branding */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-1/2 p-12"
+        style={{
+          background: 'linear-gradient(135deg, #1e3a5f 0%, #0f172a 60%)',
+          borderRight: '1px solid rgba(255,255,255,0.06)'
+        }}
+      >
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="bg-blue-100 p-4 rounded-full mb-4">
-            <Store className="h-12 w-12 text-blue-600" />
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center w-10 h-10 rounded-xl"
+            style={{ background: '#3b82f6' }}
+          >
+            <ShoppingBag className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">SMART POS</h1>
-          <p className="text-gray-600 mt-2">Point of Sale System</p>
+          <span className="text-white font-semibold text-lg tracking-tight">Smart POS</span>
         </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Center statement */}
+        <div>
+          <div
+            className="inline-block text-xs font-semibold tracking-widest uppercase mb-6 px-3 py-1 rounded-full"
+            style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa' }}
+          >
+            Point of Sale
+          </div>
+          <h2
+            className="text-5xl font-bold leading-tight mb-6"
+            style={{ color: '#f8fafc', letterSpacing: '-0.02em' }}
+          >
+            Sell smarter.<br />
+            Track everything.
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: '1.05rem', lineHeight: '1.7' }}>
+            Inventory, sales, receipts, and reports — all in one place, even offline.
+          </p>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-6">
+          {[
+            { label: 'M-Pesa Ready', value: '✓' },
+            { label: 'Works Offline', value: '✓' },
+            { label: 'Thermal Print', value: '✓' },
+          ].map(item => (
+            <div
+              key={item.label}
+              className="rounded-xl p-4"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <div className="text-xl font-bold mb-1" style={{ color: '#3b82f6' }}>{item.value}</div>
+              <div className="text-xs" style={{ color: '#64748b' }}>{item.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right panel — login form */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
+        <div className="w-full max-w-sm">
+
+          {/* Mobile logo */}
+          <div className="flex items-center gap-3 mb-10 lg:hidden">
+            <div
+              className="flex items-center justify-center w-9 h-9 rounded-xl"
+              style={{ background: '#3b82f6' }}
+            >
+              <ShoppingBag className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-white font-semibold text-lg">Smart POS</span>
+          </div>
+
+          <div className="mb-8">
+            <h1
+              className="text-3xl font-bold mb-2"
+              style={{ color: '#f1f5f9', letterSpacing: '-0.02em' }}
+            >
+              Welcome back
+            </h1>
+            <p style={{ color: '#64748b' }}>Sign in to your account to continue</p>
+          </div>
+
+          {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-              {error}
+            <div
+              className="flex items-start gap-3 px-4 py-3 rounded-xl mb-6 text-sm"
+              style={{
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.25)',
+                color: '#fca5a5'
+              }}
+            >
+              <span className="mt-0.5">⚠</span>
+              <span>{error}</span>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email */}
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: '#94a3b8' }}
+                htmlFor="email"
+              >
+                Email address
+              </label>
               <input
+                id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your email"
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 required
+                autoComplete="email"
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#f1f5f9',
+                  caretColor: '#3b82f6'
+                }}
+                onFocus={e => {
+                  e.target.style.border = '1px solid #3b82f6'
+                  e.target.style.background = 'rgba(59,130,246,0.07)'
+                }}
+                onBlur={e => {
+                  e.target.style.border = '1px solid rgba(255,255,255,0.1)'
+                  e.target.style.background = 'rgba(255,255,255,0.05)'
+                }}
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your password"
-                required
-              />
+            {/* Password */}
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: '#94a3b8' }}
+                htmlFor="password"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 pr-12 rounded-xl text-sm outline-none transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#f1f5f9',
+                    caretColor: '#3b82f6'
+                  }}
+                  onFocus={e => {
+                    e.target.style.border = '1px solid #3b82f6'
+                    e.target.style.background = 'rgba(59,130,246,0.07)'
+                  }}
+                  onBlur={e => {
+                    e.target.style.border = '1px solid rgba(255,255,255,0.1)'
+                    e.target.style.background = 'rgba(255,255,255,0.05)'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded"
+                  style={{ color: '#475569' }}
+                  tabIndex={-1}
+                >
+                  {showPassword
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye className="w-4 h-4" />
+                  }
+                </button>
+              </div>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl text-sm font-semibold transition-all mt-2"
+              style={{
+                background: loading ? '#1e40af' : '#3b82f6',
+                color: '#fff',
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.01em'
+              }}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Signing in…
+                </span>
+              ) : 'Sign in'}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <p
+            className="text-center text-xs mt-8"
+            style={{ color: '#334155' }}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        {/* Demo Credentials */}
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-          <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Admin:</strong> admin@smartpos.com / admin123</p>
-            <p><strong>Cashier:</strong> cashier@smartpos.com / cashier123</p>
-          </div>
+            Smart POS · Kadem Business Solutions
+          </p>
         </div>
       </div>
     </div>
