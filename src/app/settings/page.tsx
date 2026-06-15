@@ -19,6 +19,7 @@ export default function SettingsPage() {
   
   const [receiptSettings, setReceiptSettings] = useState({
     footer: 'Thank you for your purchase!',
+    served_by: '',
     paper_size: '80mm',
     auto_print: false
   })
@@ -294,6 +295,20 @@ export default function SettingsPage() {
                   />
                 </div>
                 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Served By (appears on receipt)
+                  </label>
+                  <input
+                    type="text"
+                    value={receiptSettings.served_by}
+                    onChange={(e) => setReceiptSettings({ ...receiptSettings, served_by: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Jane Doe, Front Desk, Cashier 1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leave blank to use the logged-in user's name</p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Paper Size

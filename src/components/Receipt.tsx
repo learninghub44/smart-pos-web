@@ -47,7 +47,7 @@ function ReceiptContent({
           <span>{formatDate(sale.created_at)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Cashier:</span>
+          <span>Served by:</span>
           <span>{cashierName}</span>
         </div>
       </div>
@@ -160,8 +160,9 @@ export default function Receipt({
   const businessPhone = settings?.business?.phone || shopPhone
   const businessEmail = settings?.business?.email || shopEmail
   const footerText = settings?.receipt?.footer || receiptFooter
+  const servedBy = settings?.receipt?.served_by || cashierName
 
-  const receiptProps = { sale, items, businessName, businessAddress, businessPhone, businessEmail, footerText, cashierName }
+  const receiptProps = { sale, items, businessName, businessAddress, businessPhone, businessEmail, footerText, cashierName: servedBy }
 
   const handleBrowserPrint = () => {
     if (!portalEl) return
@@ -282,7 +283,7 @@ export default function Receipt({
               <span>{new Date(sale.created_at).toLocaleDateString('en-KE')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Cashier:</span>
+              <span className="text-gray-500">Served by:</span>
               <span>{cashierName}</span>
             </div>
           </div>

@@ -39,12 +39,28 @@ export default function BarcodeScanner({
   const playBeep = useCallback(() => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+
+      // Main beep tone
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain); gain.connect(ctx.destination)
-      osc.frequency.value = 1200; osc.type = 'sine'
-      gain.gain.value = 0.15
-      osc.start(); osc.stop(ctx.currentTime + 0.08)
+      osc.frequency.value = 1800
+      osc.type = 'square'
+      gain.gain.setValueAtTime(0.8, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.12)
+
+      // Short second beep for double-beep feel
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.connect(gain2); gain2.connect(ctx.destination)
+      osc2.frequency.value = 2200
+      osc2.type = 'square'
+      gain2.gain.setValueAtTime(0.6, ctx.currentTime + 0.14)
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24)
+      osc2.start(ctx.currentTime + 0.14)
+      osc2.stop(ctx.currentTime + 0.24)
     } catch (_) {}
   }, [])
 
