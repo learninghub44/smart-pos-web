@@ -108,7 +108,7 @@ interface SmartPosDB extends DBSchema {
       synced: boolean
     }
     indexes: {
-      'by-synced': boolean
+      'by-synced': number
       'by-receipt-pin': string
       'by-customer': string
       'by-cashier': string
@@ -188,13 +188,13 @@ interface SmartPosDB extends DBSchema {
     value: {
       id: string
       action_type: string
-      payload: unknown
+      payload: any
       synced: boolean
       retry_count: number
       created_at: string
     }
     indexes: {
-      'by-synced': boolean
+      'by-synced': number
     }
   }
   settings: {
@@ -247,7 +247,7 @@ export async function getDB(): Promise<IDBPDatabase<SmartPosDB>> {
   if (db) return db
 
   db = await openDB<SmartPosDB>('smart-pos-db', 2, {
-    upgrade(db, oldVersion, newVersion) {
+    upgrade(db, oldVersion, newVersion, transaction) {
       // Products store
       if (!db.objectStoreNames.contains('products')) {
         const productStore = db.createObjectStore('products', { keyPath: 'id' })
@@ -256,7 +256,7 @@ export async function getDB(): Promise<IDBPDatabase<SmartPosDB>> {
         productStore.createIndex('by-category', 'category_id')
         productStore.createIndex('by-brand', 'brand_id')
       } else if (oldVersion < 2) {
-        const productStore = db.transaction('products', 'readwrite').objectStore('products')!
+        const productStore = transaction.objectStore('products')
         if (!productStore.indexNames.contains('by-sku')) {
           productStore.createIndex('by-sku', 'sku', { unique: true })
         }
@@ -300,7 +300,7 @@ export async function getDB(): Promise<IDBPDatabase<SmartPosDB>> {
         salesStore.createIndex('by-cashier', 'cashier_id')
         salesStore.createIndex('by-created-at', 'created_at')
       } else if (oldVersion < 2) {
-        const salesStore = db.transaction('sales', 'readwrite').objectStore('sales')!
+        const salesStore = transaction.objectStore('sales')
         if (!salesStore.indexNames.contains('by-customer')) {
           salesStore.createIndex('by-customer', 'customer_id')
         }
@@ -318,7 +318,7 @@ export async function getDB(): Promise<IDBPDatabase<SmartPosDB>> {
         saleItemsStore.createIndex('by-sale-id', 'sale_id')
         saleItemsStore.createIndex('by-product-id', 'product_id')
       } else if (oldVersion < 2) {
-        const saleItemsStore = db.transaction('sale_items', 'readwrite').objectStore('sale_items')!
+        const saleItemsStore = transaction.objectStore('sale_items')
         if (!saleItemsStore.indexNames.contains('by-product-id')) {
           saleItemsStore.createIndex('by-product-id', 'product_id')
         }
@@ -344,7 +344,7 @@ export async function getDB(): Promise<IDBPDatabase<SmartPosDB>> {
         inventoryLogsStore.createIndex('by-product-id', 'product_id')
         inventoryLogsStore.createIndex('by-created-at', 'created_at')
       } else if (oldVersion < 2) {
-        const inventoryLogsStore = db.transaction('inventory_logs', 'readwrite').objectStore('inventory_logs')!
+        const inventoryLogsStore = transaction.objectStore('inventory_logs')
         if (!inventoryLogsStore.indexNames.contains('by-created-at')) {
           inventoryLogsStore.createIndex('by-created-at', 'created_at')
         }
@@ -518,7 +518,7 @@ export async function getSaleByReceiptPin(receiptPin: string) {
 
 export async function getUnsyncedSales() {
   const db = await getDB()
-  return db.getAllFromIndex('sales', 'by-synced', false)
+  return db.getAllFromIndex('sales', 'by-synced', 0)
 }
 
 export async function getAllSales() {
@@ -602,7 +602,7 @@ export async function addToOfflineQueue(action: any) {
 
 export async function getUnsyncedActions() {
   const db = await getDB()
-  return db.getAllFromIndex('offline_queue', 'by-synced', false)
+  return db.getAllFromIndex('offline_queue', 'by-synced', 0)
 }
 
 export async function markActionAsSynced(id: string) {

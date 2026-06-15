@@ -210,11 +210,11 @@ class ThermalPrinter {
   // Connect to Bluetooth printer
   async connectBluetooth(): Promise<boolean> {
     try {
-      if (!navigator.bluetooth) {
+      if (!(navigator as any).bluetooth) {
         throw new Error('WebBluetooth not supported')
       }
 
-      const device = await navigator.bluetooth.requestDevice({
+      const device = await (navigator as any).bluetooth.requestDevice({
         filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Serial Port Profile
       })
       
@@ -291,7 +291,7 @@ class ThermalPrinter {
             type: 'usb',
             device,
             name: device.productName || 'USB Printer',
-            id: device.serialNumber || device.deviceId
+            id: device.serialNumber || String(device.vendorId)
           })
         })
       } catch (error) {

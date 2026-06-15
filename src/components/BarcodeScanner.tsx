@@ -96,7 +96,7 @@ export default function BarcodeScanner({ onScan, onClose, continuous = true, sho
 
     try {
       await scannerRef.current.applyVideoConstraints({
-        advanced: [{ torch: !flashlightOn }]
+        advanced: [{ torch: !flashlightOn } as MediaTrackConstraintSet]
       })
       setFlashlightOn(!flashlightOn)
     } catch (err) {
