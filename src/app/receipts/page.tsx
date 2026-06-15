@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Receipt as ReceiptIcon, X, Camera } from 'lucide-react'
-import { getSaleByReceiptPin, getSaleItemsBySaleId } from '@/lib/indexeddb'
+import { Receipt as ReceiptIcon, X, Camera } from 'lucide-react'
+import { getSaleByReceiptPin, getSaleItemsBySaleId, getAllProducts } from '@/lib/indexeddb'
 import Receipt from '@/components/Receipt'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -14,103 +14,112 @@ export default function ReceiptsPage() {
   const [saleItems, setSaleItems] = useState<any[]>([])
   const [showReceipt, setShowReceipt] = useState(false)
   const [showCameraScanner, setShowCameraScanner] = useState(false)
+  const [businessSettings, setBusinessSettings] = useState<any>(null)
+
+  useEffect(() => {
+    loadBusinessSettings()
+  }, [])
+
+  const loadBusinessSettings = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data } = await supabase.from('settings').select('*').eq('key', 'business').single()
+      if (data) { setBusinessSettings(data.value); return }
+    } catch (_) {}
+    try {
+      const { getSettingByKey } = await import('@/lib/indexeddb')
+      const business = await getSettingByKey('business')
+      if (business) setBusinessSettings(business.value)
+    } catch (_) {}
+  }
 
   const handleReceiptScan = async (pin: string) => {
     setSearchPin(pin)
-    await handleSearch()
+    await doSearch(pin)
     setShowCameraScanner(false)
   }
 
-  // USB barcode scanner integration
   useBarcodeScanner({
     onScan: handleReceiptScan,
     enabled: !showReceipt && !showCameraScanner
   })
 
-  const handleSearch = async () => {
-    if (!searchPin.trim()) return
+  const doSearch = async (pin: string) => {
+    if (!pin.trim()) return
 
     try {
       const { supabase } = await import('@/lib/supabase')
-      
+
       let query = supabase.from('sales').select('*')
-      
-      // Apply search based on search type
+
       if (searchType === 'receipt_pin') {
-        query = query.eq('receipt_pin', searchPin.toUpperCase())
+        query = query.eq('receipt_pin', pin.toUpperCase())
       } else if (searchType === 'receipt_number') {
-        query = query.eq('receipt_number', searchPin.toUpperCase())
+        query = query.eq('receipt_number', pin.toUpperCase())
       } else if (searchType === 'customer_phone') {
-        // Need to join with customers table
         const { data: customers } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('phone', searchPin)
-          .single()
-        
+          .from('customers').select('id').eq('phone', pin).single()
         if (customers) {
-          query = query.eq('customer_id', customers.id)
+          query = query.eq('customer_id', (customers as any).id)
         } else {
-          alert('Customer not found')
-          return
+          alert('Customer not found'); return
         }
       } else if (searchType === 'customer_name') {
         const { data: customers } = await supabase
-          .from('customers')
-          .select('id')
-          .ilike('name', `%${searchPin}%`)
-        
+          .from('customers').select('id').ilike('name', `%${pin}%`)
         if (customers && customers.length > 0) {
-          query = query.in('customer_id', customers.map(c => c.id))
+          query = query.in('customer_id', customers.map((c: any) => c.id))
         } else {
-          alert('Customer not found')
-          return
+          alert('Customer not found'); return
         }
       } else if (searchType === 'sale_date') {
-        query = query.gte('created_at', `${searchPin}T00:00:00`)
-          .lte('created_at', `${searchPin}T23:59:59`)
+        query = query
+          .gte('created_at', `${pin}T00:00:00`)
+          .lte('created_at', `${pin}T23:59:59`)
       }
-      
+
       const { data: sale, error: saleError } = await query.single()
-      
+
       if (sale && !saleError) {
-        setFoundSale(sale)
-        
-        // Get sale items with product names
+        // Fetch cashier name from users table
+        let cashierName = 'Cashier'
+        if (sale.cashier_id) {
+          const { data: cashierData } = await supabase
+            .from('users').select('name').eq('id', sale.cashier_id).single()
+          if (cashierData) cashierName = (cashierData as any).name
+        }
+
+        setFoundSale({ ...sale, cashier_name: cashierName })
+
         const { data: items, error: itemsError } = await supabase
-          .from('sale_items')
-          .select('*, products(name)')
-          .eq('sale_id', sale.id)
-        
+          .from('sale_items').select('*, products(name)').eq('sale_id', sale.id)
+
         if (items && !itemsError) {
-          const itemsWithNames = items.map((item: any) => ({
+          setSaleItems(items.map((item: any) => ({
             ...item,
-            name: item.products?.name || `Product ${item.product_id.substring(0, 8)}`,
+            name: item.products?.name || 'Unknown Product',
             total: item.price * item.quantity
-          }))
-          setSaleItems(itemsWithNames)
+          })))
           setShowReceipt(true)
           return
         }
       }
-    } catch (error) {
+    } catch (_) {
       console.log('Supabase not available, using IndexedDB')
     }
-    
-    // Fall back to IndexedDB
-    const sale = await getSaleByReceiptPin(searchPin.toUpperCase())
-    
+
+    // Fallback to IndexedDB
+    const sale = await getSaleByReceiptPin(pin.toUpperCase())
     if (sale) {
       setFoundSale(sale)
       const items = await getSaleItemsBySaleId(sale.id)
-      // In production, you'd fetch product names from products table
-      // For demo, we'll use placeholder names
-      const itemsWithNames = items.map((item: any) => ({
+      const allProducts = await getAllProducts()
+      const productMap = new Map(allProducts.map(p => [p.id, p.name]))
+      setSaleItems(items.map((item: any) => ({
         ...item,
-        name: `Product ${item.product_id.substring(0, 8)}`,
+        name: item.product_id ? (productMap.get(item.product_id) || 'Unknown Product') : 'Unknown Product',
         total: item.price * item.quantity
-      }))
-      setSaleItems(itemsWithNames)
+      })))
       setShowReceipt(true)
     } else {
       alert('Receipt not found with this PIN')
@@ -120,10 +129,10 @@ export default function ReceiptsPage() {
     }
   }
 
+  const handleSearch = () => doSearch(searchPin)
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch()
-    }
+    if (e.key === 'Enter') handleSearch()
   }
 
   const clearSearch = () => {
@@ -135,13 +144,11 @@ export default function ReceiptsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Receipts</h1>
         <p className="text-gray-600 mt-1">Search and verify receipts by PIN</p>
       </div>
 
-      {/* Search Section */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="space-y-4">
           <div>
@@ -165,7 +172,7 @@ export default function ReceiptsPage() {
                 type="text"
                 placeholder={
                   searchType === 'receipt_pin' ? 'Enter Receipt PIN (e.g., POS-ABC123)' :
-                  searchType === 'receipt_number' ? 'Enter Receipt Number (e.g., RCP-20240614-ABC123)' :
+                  searchType === 'receipt_number' ? 'Enter Receipt Number' :
                   searchType === 'customer_phone' ? 'Enter Customer Phone' :
                   searchType === 'customer_name' ? 'Enter Customer Name' :
                   'Enter Sale Date (YYYY-MM-DD)'
@@ -200,28 +207,27 @@ export default function ReceiptsPage() {
         </div>
       </div>
 
-      {/* Receipt Display */}
       {showReceipt && foundSale && (
         <div className="bg-white rounded-xl shadow-sm p-6">
           <Receipt
-            sale={{
-              ...foundSale,
-              cashier_name: 'Cashier' // In production, fetch from users table
-            }}
+            sale={foundSale}
             items={saleItems}
-            shopName="SMART POS"
+            shopName={businessSettings?.name || 'SMART POS'}
+            shopAddress={businessSettings?.address || ''}
+            shopPhone={businessSettings?.phone || ''}
+            shopEmail={businessSettings?.email || ''}
+            cashierName={foundSale.cashier_name || 'Cashier'}
           />
         </div>
       )}
 
-      {/* Instructions */}
       {!showReceipt && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
           <h3 className="font-semibold text-blue-900 mb-2">How to verify a receipt:</h3>
           <ol className="list-decimal list-inside space-y-2 text-blue-800">
             <li>Ask the customer for their Receipt PIN</li>
             <li>Enter the PIN in the search field above</li>
-            <li>Click "Search" to view the receipt details</li>
+            <li>Click &quot;Search&quot; to view the receipt details</li>
             <li>Verify the items, total, and payment method</li>
             <li>Print the receipt if needed for returns or exchanges</li>
           </ol>

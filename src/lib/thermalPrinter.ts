@@ -79,8 +79,8 @@ class ThermalPrinter {
   }
 
   // Convert string to bytes
-  private toBytes(str: string): number[] {
-    return Array.from(this.encoder.encode(str))
+  private toBytes(str: string): Uint8Array {
+    return this.encoder.encode(str)
   }
 
   // Format receipt data

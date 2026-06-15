@@ -8,7 +8,7 @@ export interface User {
   role: 'admin' | 'cashier'
 }
 
-// Simple password hashing for demo (use bcrypt in production)
+// SHA-256 password hashing (matches server-side registration)
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(password)
@@ -54,36 +54,6 @@ export async function login(email: string, password: string): Promise<{ success:
       } else {
         return { success: false, error: 'Invalid credentials' }
       }
-    }
-    
-    // Fallback to demo credentials for initial setup
-    // These should be removed in production
-    if (email === 'admin@smartpos.com' && password === 'admin123') {
-      const adminUser: User = {
-        id: 'admin-001',
-        name: 'Admin User',
-        email: 'admin@smartpos.com',
-        role: 'admin'
-      }
-      
-      // Store in IndexedDB for offline access
-      await addUserToDB(adminUser)
-      
-      return { success: true, user: adminUser }
-    }
-    
-    if (email === 'cashier@smartpos.com' && password === 'cashier123') {
-      const cashierUser: User = {
-        id: 'cashier-001',
-        name: 'Cashier User',
-        email: 'cashier@smartpos.com',
-        role: 'cashier'
-      }
-      
-      // Store in IndexedDB for offline access
-      await addUserToDB(cashierUser)
-      
-      return { success: true, user: cashierUser }
     }
     
     return { success: false, error: 'Invalid credentials' }

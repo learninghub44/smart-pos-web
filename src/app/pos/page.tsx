@@ -40,6 +40,7 @@ export default function POSPage() {
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const [completedSale, setCompletedSale] = useState<any>(null)
+  const [businessSettings, setBusinessSettings] = useState<any>(null)
 
   const handleBarcodeScan = async (barcode: string) => {
     const product = await getProductByBarcode(barcode)
@@ -59,7 +60,18 @@ export default function POSPage() {
   useEffect(() => {
     loadProducts()
     loadUser()
+    loadBusinessSettings()
   }, [])
+
+  const loadBusinessSettings = async () => {
+    try {
+      const { getSettingByKey } = await import('@/lib/indexeddb')
+      const business = await getSettingByKey('business')
+      if (business) setBusinessSettings(business.value)
+    } catch (error) {
+      console.log('Error loading business settings')
+    }
+  }
 
   // USB barcode scanner integration
   useBarcodeScanner({
@@ -734,7 +746,10 @@ export default function POSPage() {
             <Receipt
               sale={completedSale}
               items={completedSale.items}
-              shopName="SMART POS"
+              shopName={businessSettings?.name || 'SMART POS'}
+              shopAddress={businessSettings?.address || ''}
+              shopPhone={businessSettings?.phone || ''}
+              shopEmail={businessSettings?.email || ''}
               cashierName={user?.name || 'Cashier'}
             />
 
