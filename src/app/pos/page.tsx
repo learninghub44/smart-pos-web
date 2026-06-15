@@ -16,6 +16,7 @@ interface CartItem {
   quantity: number
   stock: number
   discountAmount: number
+  image_url: string | null
 }
 
 export default function POSPage() {
@@ -23,6 +24,7 @@ export default function POSPage() {
   const [products, setProducts] = useState<any[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [showCameraScanner, setShowCameraScanner] = useState(false)
+  const [scanFlash, setScanFlash] = useState<{ name: string; price: number; image_url: string | null } | null>(null)
   const [showUSBScanner, setShowUSBScanner] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [showCheckout, setShowCheckout] = useState(false)
@@ -56,8 +58,13 @@ export default function POSPage() {
 
   async function handleBarcodeScan(barcode: string) {
     const product = products.find(p => p.barcode === barcode) || await getProductByBarcode(barcode)
-    if (product) addToCart(product)
-    else alert(`Product not found: ${barcode}`)
+    if (product) {
+      addToCart(product)
+      setScanFlash({ name: product.name, price: product.selling_price, image_url: product.image_url || null })
+      setTimeout(() => setScanFlash(null), 1800)
+    } else {
+      alert(`Product not found: ${barcode}`)
+    }
   }
 
   async function loadUser() {
@@ -108,7 +115,7 @@ export default function POSPage() {
         if (existing.quantity >= product.stock) { alert(`Only ${product.stock} in stock`); return prev }
         return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
       }
-      return [...prev, { id: product.id, name: product.name, barcode: product.barcode, price: product.selling_price, quantity: 1, stock: product.stock, discountAmount: 0 }]
+      return [...prev, { id: product.id, name: product.name, barcode: product.barcode, price: product.selling_price, quantity: 1, stock: product.stock, discountAmount: 0, image_url: product.image_url || null }]
     })
   }
 
@@ -223,6 +230,30 @@ export default function POSPage() {
       {/* Camera Scanner */}
       {showCameraScanner && (
         <BarcodeScanner onScan={async (b) => { await handleBarcodeScan(b); setShowCameraScanner(false) }} onClose={() => setShowCameraScanner(false)} continuous={false} showFlashlight={true} />
+      )}
+
+      {/* Scan success flash */}
+      {scanFlash && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
+          <div className="flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-2xl animate-bounce-in">
+            {scanFlash.image_url ? (
+              <img src={scanFlash.image_url} alt={scanFlash.name}
+                className="w-12 h-12 rounded-xl object-cover border-2 border-green-400 flex-shrink-0" />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-green-500/20 border-2 border-green-400 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-400 text-xl font-bold">{scanFlash.name.charAt(0)}</span>
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-xs font-medium text-green-400 uppercase tracking-wide">Added to cart</span>
+              </div>
+              <p className="font-semibold text-sm leading-tight truncate max-w-[180px]">{scanFlash.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">KES {Number(scanFlash.price).toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* USB Scanner modal */}
@@ -422,14 +453,31 @@ export default function POSPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
                 {filteredProducts.map(p => (
                   <button key={p.id} onClick={() => addToCart(p)} disabled={p.stock <= 0}
-                    className={`text-left bg-white border rounded-xl p-3 transition-all ${p.stock <= 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-400 hover:shadow-sm active:scale-95'}`}>
-                    <p className="font-semibold text-gray-900 text-sm leading-tight mb-1">{p.name}</p>
-                    {p.sku && <p className="text-xs text-gray-400 mb-2">{p.sku}</p>}
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-600 font-bold text-sm">KES {Number(p.selling_price).toLocaleString()}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${p.stock <= 0 ? 'bg-red-100 text-red-600' : p.stock < 10 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                        {p.stock <= 0 ? 'Out' : `${p.stock}`}
+                    className={`text-left bg-white border rounded-xl overflow-hidden transition-all ${p.stock <= 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-400 hover:shadow-md active:scale-95'}`}>
+                    {/* Product image */}
+                    <div className="w-full aspect-square bg-gray-100 relative overflow-hidden">
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-gray-300 leading-none">
+                              {p.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="text-[9px] text-gray-300 mt-0.5 font-mono">{p.barcode?.slice(-4)}</div>
+                          </div>
+                        </div>
+                      )}
+                      <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${p.stock <= 0 ? 'bg-red-500 text-white' : p.stock < 10 ? 'bg-amber-400 text-white' : 'bg-green-500 text-white'}`}>
+                        {p.stock <= 0 ? 'Out' : p.stock}
                       </span>
+                    </div>
+                    {/* Product info */}
+                    <div className="p-2.5">
+                      <p className="font-semibold text-gray-900 text-xs leading-tight mb-1 line-clamp-2">{p.name}</p>
+                      <span className="text-blue-600 font-bold text-sm">KES {Number(p.selling_price).toLocaleString()}</span>
                     </div>
                   </button>
                 ))}
@@ -458,8 +506,13 @@ export default function POSPage() {
               </div>
             ) : cart.map(item => (
               <div key={item.id} className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-sm font-medium text-gray-900 leading-tight flex-1 pr-2">{item.name}</p>
+                <div className="flex items-start justify-between mb-2 gap-2">
+                  {item.image_url && (
+                    <img src={item.image_url} alt={item.name}
+                      className="w-9 h-9 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  )}
+                  <p className="text-sm font-medium text-gray-900 leading-tight flex-1">{item.name}</p>
                   <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 flex-shrink-0">
                     <Trash2 className="w-4 h-4" />
                   </button>
