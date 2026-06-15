@@ -40,27 +40,36 @@ export default function BarcodeScanner({
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
 
-      // Main beep tone
+      // Compressor to maximise perceived loudness without clipping
+      const compressor = ctx.createDynamicsCompressor()
+      compressor.threshold.value = -6
+      compressor.knee.value = 3
+      compressor.ratio.value = 8
+      compressor.attack.value = 0.001
+      compressor.release.value = 0.1
+      compressor.connect(ctx.destination)
+
+      // Main beep — sine wave is louder perceptually than square at same gain
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-      osc.connect(gain); gain.connect(ctx.destination)
+      osc.connect(gain); gain.connect(compressor)
       osc.frequency.value = 1800
-      osc.type = 'square'
-      gain.gain.setValueAtTime(0.8, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(1.0, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15)
       osc.start(ctx.currentTime)
-      osc.stop(ctx.currentTime + 0.12)
+      osc.stop(ctx.currentTime + 0.15)
 
-      // Short second beep for double-beep feel
+      // Second higher beep
       const osc2 = ctx.createOscillator()
       const gain2 = ctx.createGain()
-      osc2.connect(gain2); gain2.connect(ctx.destination)
-      osc2.frequency.value = 2200
-      osc2.type = 'square'
-      gain2.gain.setValueAtTime(0.6, ctx.currentTime + 0.14)
-      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24)
-      osc2.start(ctx.currentTime + 0.14)
-      osc2.stop(ctx.currentTime + 0.24)
+      osc2.connect(gain2); gain2.connect(compressor)
+      osc2.frequency.value = 2400
+      osc2.type = 'sine'
+      gain2.gain.setValueAtTime(1.0, ctx.currentTime + 0.18)
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.30)
+      osc2.start(ctx.currentTime + 0.18)
+      osc2.stop(ctx.currentTime + 0.30)
     } catch (_) {}
   }, [])
 

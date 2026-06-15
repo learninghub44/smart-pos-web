@@ -65,7 +65,8 @@ export default function InventoryPage() {
   const [showBarcodeModal, setShowBarcodeModal] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [lookingUp, setLookingUp] = useState(false)
-  const [lookupResult, setLookupResult] = useState<{ source: string; name: string } | null>(null)
+  const [lookupResult, setLookupResult] = useState<{ source: string; name: string; brand?: string; category?: string; imageUrl?: string } | null>(null)
+  const [lookupImageUrl, setLookupImageUrl] = useState<string>('')
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [formData, setFormData] = useState({
     name: '', sku: '', barcode: '', unit: '',
@@ -87,6 +88,7 @@ export default function InventoryPage() {
     if (!barcode || barcode.length < 8) return
     setLookingUp(true)
     setLookupResult(null)
+    setLookupImageUrl('')
     try {
       const result = await lookupBarcode(barcode)
       if (result?.name) {
@@ -95,7 +97,14 @@ export default function InventoryPage() {
           name: prev.name || result.name || '',
           unit: prev.unit || result.unit || '',
         }))
-        setLookupResult({ source: result.source || 'Online DB', name: result.name })
+        if (result.imageUrl) setLookupImageUrl(result.imageUrl)
+        setLookupResult({
+          source: result.source || 'Online DB',
+          name: result.name,
+          brand: result.brand,
+          category: result.category,
+          imageUrl: result.imageUrl,
+        })
       }
     } catch (_) {}
     setLookingUp(false)
@@ -134,6 +143,7 @@ export default function InventoryPage() {
     setEditingProduct(null)
     setLookupResult(null)
     setLookingUp(false)
+    setLookupImageUrl('')
     setFormData({ name: '', sku: '', barcode: generateBarcode(), unit: '', cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: '' })
     setShowModal(true)
   }
@@ -142,6 +152,7 @@ export default function InventoryPage() {
     setEditingProduct(p)
     setLookupResult(null)
     setLookingUp(false)
+    setLookupImageUrl(p.image_url || '')
     setFormData({
       name: p.name, sku: p.sku || '', barcode: p.barcode, unit: p.unit || '',
       cost_price: p.cost_price.toString(), selling_price: p.selling_price.toString(),
@@ -171,7 +182,7 @@ export default function InventoryPage() {
       selling_price: parseFloat(formData.selling_price),
       tax_rate: parseFloat(formData.tax_rate) || 0,
       stock: parseInt(formData.stock), minimum_stock: parseInt(formData.minimum_stock) || 0,
-      image_url: null, archived: false,
+      image_url: lookupImageUrl || null, archived: false,
       created_at: editingProduct?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
@@ -258,8 +269,21 @@ export default function InventoryPage() {
                 ) : filteredProducts.map(p => (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{p.name}</div>
-                      {p.sku && <div className="text-xs text-gray-400">{p.sku}</div>}
+                      <div className="flex items-center gap-3">
+                        {p.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.image_url} alt={p.name} className="w-9 h-9 rounded-lg object-contain bg-gray-50 border border-gray-200 flex-shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Package className="w-4 h-4 text-gray-400" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium text-gray-900">{p.name}</div>
+                          {p.sku && <div className="text-xs text-gray-400">{p.sku}</div>}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <button onClick={() => setShowBarcodeModal(p)}
@@ -389,11 +413,35 @@ export default function InventoryPage() {
                     </button>
                   </div>
 
-                  {/* Lookup result banner */}
+                  {/* Lookup result — rich product card */}
                   {lookupResult && (
-                    <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Found <strong>{lookupResult.name}</strong> from {lookupResult.source} — fields auto-filled</span>
+                    <div className="mt-3 border border-green-200 bg-green-50 rounded-xl overflow-hidden">
+                      <div className="flex items-stretch gap-0">
+                        {lookupResult.imageUrl && (
+                          <div className="w-20 flex-shrink-0 bg-white flex items-center justify-center p-1.5 border-r border-green-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={lookupResult.imageUrl}
+                              alt={lookupResult.name}
+                              className="w-full h-16 object-contain rounded"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 p-3 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-green-700">Found via {lookupResult.source}</span>
+                          </div>
+                          <p className="text-sm font-bold text-gray-900 leading-tight truncate">{lookupResult.name}</p>
+                          {lookupResult.brand && (
+                            <p className="text-xs text-gray-500 mt-0.5">Brand: <span className="font-medium text-gray-700">{lookupResult.brand}</span></p>
+                          )}
+                          {lookupResult.category && (
+                            <p className="text-xs text-gray-500">Category: <span className="font-medium text-gray-700">{lookupResult.category}</span></p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                   {!lookingUp && !lookupResult && formData.barcode.length >= 8 && !editingProduct && (
