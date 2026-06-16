@@ -1,59 +1,46 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, Plus, Edit, Trash2, Package, AlertCircle, Camera, Barcode, RefreshCw, X, Download, Loader2, Sparkles, CheckCircle2 } from 'lucide-react'
-import { getAllProducts, addProductToDB, updateProductInDB, deleteProductFromDB, getProductByBarcode } from '@/lib/indexeddb'
+import { useState, useEffect, useRef } from 'react'
+import { 
+  Search, Plus, Edit, Trash2, Package, AlertCircle, 
+  Camera, X, Loader2, CheckCircle2, ImageOff
+} from 'lucide-react'
+import { 
+  getAllProducts, addProductToDB, updateProductInDB, 
+  deleteProductFromDB, getProductByBarcode 
+} from '@/lib/indexeddb'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { lookupBarcode } from '@/lib/productLookup'
+import { lookupBarcode, ProductLookupResult } from '@/lib/productLookup'
+import { getActiveBranchId } from '@/lib/auth'
 
 interface Product {
-  id: string; name: string; sku: string | null; barcode: string
-  category_id: string | null; brand_id: string | null; unit: string | null
-  cost_price: number; selling_price: number; tax_rate: number
-  stock: number; minimum_stock: number; image_url: string | null
-  archived: boolean; created_at: string; updated_at: string
+  id: string
+  name: string
+  sku: string | null
+  barcode: string
+  category_id: string | null
+  brand_id: string | null
+  brand: string | null
+  category: string | null
+  unit: string | null
+  cost_price: number
+  selling_price: number
+  tax_rate: number
+  stock: number
+  minimum_stock: number
+  image_url: string | null
+  archived: boolean
+  created_at: string
+  updated_at: string
 }
 
-// Generate EAN13-style barcode number
-function generateBarcode(): string {
-  const prefix = '6' // East Africa region prefix
-  const num = prefix + Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('')
-  // Calculate check digit
-  let sum = 0
-  for (let i = 0; i < 12; i++) sum += parseInt(num[i]) * (i % 2 === 0 ? 1 : 3)
-  const check = (10 - (sum % 10)) % 10
-  return num + check
-}
-
-// SVG barcode renderer (Code128 simplified)
-function BarcodeDisplay({ value, width = 200, height = 60 }: { value: string; width?: number; height?: number }) {
-  const svgRef = useRef<SVGSVGElement>(null)
-
-  useEffect(() => {
-    if (!svgRef.current || !value) return
-    try {
-      import('jsbarcode').then(({ default: JsBarcode }) => {
-        JsBarcode(svgRef.current, value, {
-          format: 'EAN13',
-          width: 1.5,
-          height: height - 20,
-          displayValue: true,
-          fontSize: 11,
-          margin: 4,
-          background: '#ffffff',
-          lineColor: '#000000'
-        })
-      }).catch(() => {
-        // Fallback: show text barcode
-        if (svgRef.current) {
-          svgRef.current.innerHTML = `<text x="50%" y="50%" text-anchor="middle" font-family="monospace" font-size="12">${value}</text>`
-        }
-      })
-    } catch (_) {}
-  }, [value, height])
-
-  return <svg ref={svgRef} width={width} height={height} />
+const EMPTY_FORM = {
+  name: '', sku: '', barcode: '', unit: '',
+  brand: '', category: '',
+  cost_price: '', selling_price: '', tax_rate: '0',
+  stock: '', minimum_stock: '10',
+  image_url: ''
 }
 
 export default function InventoryPage() {
@@ -62,522 +49,753 @@ export default function InventoryPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [showCameraScanner, setShowCameraScanner] = useState(false)
-  const [showBarcodeModal, setShowBarcodeModal] = useState<Product | null>(null)
+  const [formData, setFormData] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
-  const [lookingUp, setLookingUp] = useState(false)
-  const [lookupResult, setLookupResult] = useState<{ source: string; name: string; brand?: string; category?: string; imageUrl?: string } | null>(null)
-  const [lookupImageUrl, setLookupImageUrl] = useState<string>('')
-  const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [formData, setFormData] = useState({
-    name: '', sku: '', barcode: '', unit: '', brand: '', category: '',
-    cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: ''
-  })
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'all' | 'low' | 'out'>('all')
+  
+  // Lookup state
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [lookupResult, setLookupResult] = useState<ProductLookupResult | null>(null)
+  const [lookupNotFound, setLookupNotFound] = useState(false)
+  const barcodeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { loadProducts() }, [])
 
+  // Auto-trigger lookup when barcode is typed (with debounce)
+  const onBarcodeChange = (val: string) => {
+    setFormData(prev => ({ ...prev, barcode: val }))
+    setLookupResult(null)
+    setLookupNotFound(false)
+    if (barcodeDebounce.current) clearTimeout(barcodeDebounce.current)
+    if (val.trim().length >= 6) {
+      barcodeDebounce.current = setTimeout(() => triggerLookup(val.trim()), 800)
+    }
+  }
+
+  const triggerLookup = async (barcode: string) => {
+    setLookupLoading(true)
+    setLookupResult(null)
+    setLookupNotFound(false)
+    try {
+      const result = await lookupBarcode(barcode)
+      if (result) {
+        setLookupResult(result)
+        // Auto-fill form fields from lookup
+        setFormData(prev => ({
+          ...prev,
+          name: result.name || prev.name,
+          brand: result.brand || prev.brand,
+          category: result.category || prev.category,
+          unit: result.unit || prev.unit,
+          image_url: result.imageUrl || prev.image_url,
+        }))
+      } else {
+        setLookupNotFound(true)
+      }
+    } catch {
+      setLookupNotFound(true)
+    }
+    setLookupLoading(false)
+  }
+
   const handleBarcodeScan = async (barcode: string) => {
+    // If in edit mode — check for conflicts
+    if (!editingProduct || editingProduct.barcode !== barcode) {
+      const existing = await getProductByBarcode(barcode)
+      if (existing && existing.id !== editingProduct?.id) {
+        setError(`Barcode already used by: ${existing.name}`)
+        setShowCameraScanner(false)
+        return
+      }
+    }
     setFormData(prev => ({ ...prev, barcode }))
     setShowCameraScanner(false)
+    setError(null)
+    // Trigger online lookup
     triggerLookup(barcode)
   }
 
-  useBarcodeScanner({ onScan: handleBarcodeScan, enabled: showModal && !showCameraScanner })
-
-  // Auto-lookup product details when barcode changes
-  const triggerLookup = useCallback(async (barcode: string) => {
-    if (!barcode || barcode.length < 8) return
-    setLookingUp(true)
-    setLookupResult(null)
-    setLookupImageUrl('')
-    try {
-      const result = await lookupBarcode(barcode)
-      if (result?.name) {
-        setFormData(prev => ({
-          ...prev,
-          name: prev.name || result.name || '',
-          unit: prev.unit || result.unit || '',
-          brand: prev.brand || result.brand || '',
-          category: prev.category || result.category || '',
-        }))
-        if (result.imageUrl) setLookupImageUrl(result.imageUrl)
-        setLookupResult({
-          source: result.source || 'Online DB',
-          name: result.name,
-          brand: result.brand,
-          category: result.category,
-          imageUrl: result.imageUrl,
-        })
-      }
-    } catch (_) {}
-    setLookingUp(false)
-  }, [])
-
-  const handleBarcodeChange = (value: string) => {
-    setFormData(prev => ({ ...prev, barcode: value }))
-    setLookupResult(null)
-    if (lookupTimer.current) clearTimeout(lookupTimer.current)
-    if (value.length >= 8) {
-      lookupTimer.current = setTimeout(() => triggerLookup(value), 600)
-    }
-  }
+  useBarcodeScanner({
+    onScan: handleBarcodeScan,
+    enabled: showModal && !showCameraScanner
+  })
 
   const loadProducts = async () => {
     try {
       const { supabase } = await import('@/lib/supabase')
       const branchId = getActiveBranchId()
-      const q = supabase.from('products').select('*').order('created_at', { ascending: false })
-      const { data, error } = branchId ? await q.eq('branch_id', branchId) : await q
+      let query = supabase.from('products').select('*').order('name', { ascending: true })
+      if (branchId) query = query.eq('branch_id', branchId)
+      const { data, error } = await query
       if (data && !error) {
         setProducts(data)
         for (const p of data) await updateProductInDB(p)
         return
       }
-    } catch (_) {}
-    const local = await getAllProducts()
-    setProducts(local)
+    } catch {}
+    const all = await getAllProducts()
+    setProducts(all)
   }
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.barcode || '').includes(searchTerm) ||
-    (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const displayedProducts = products
+    .filter(p => !p.archived)
+    .filter(p => {
+      if (filter === 'low') return p.stock > 0 && p.stock <= (p.minimum_stock || 10)
+      if (filter === 'out') return p.stock === 0
+      return true
+    })
+    .filter(p =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.barcode.includes(searchTerm) ||
+      (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.brand || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
 
   const openAdd = () => {
     setEditingProduct(null)
+    setFormData(EMPTY_FORM)
+    setError(null)
     setLookupResult(null)
-    setLookingUp(false)
-    setLookupImageUrl('')
-    setFormData({ name: '', sku: '', barcode: generateBarcode(), unit: '', brand: '', category: '', cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: '' })
+    setLookupNotFound(false)
     setShowModal(true)
   }
 
-  const openEdit = (p: Product) => {
-    setEditingProduct(p)
-    setLookupResult(null)
-    setLookingUp(false)
-    setLookupImageUrl(p.image_url || '')
+  const openEdit = (product: Product) => {
+    setEditingProduct(product)
     setFormData({
-      name: p.name, sku: p.sku || '', barcode: p.barcode, unit: p.unit || '',
-      brand: '', category: '',
-      cost_price: p.cost_price.toString(), selling_price: p.selling_price.toString(),
-      tax_rate: p.tax_rate.toString(), stock: p.stock.toString(),
-      minimum_stock: p.minimum_stock.toString()
+      name: product.name,
+      sku: product.sku || '',
+      barcode: product.barcode,
+      brand: (product as any).brand || '',
+      category: (product as any).category || '',
+      unit: product.unit || '',
+      cost_price: product.cost_price.toString(),
+      selling_price: product.selling_price.toString(),
+      tax_rate: product.tax_rate.toString(),
+      stock: product.stock.toString(),
+      minimum_stock: product.minimum_stock.toString(),
+      image_url: product.image_url || ''
     })
+    setError(null)
+    setLookupResult(null)
+    setLookupNotFound(false)
     setShowModal(true)
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this product?')) return
+    if (!confirm('Delete this product? This cannot be undone.')) return
     try {
       const { supabase } = await import('@/lib/supabase')
       await supabase.from('products').delete().eq('id', id)
-    } catch (_) {}
+    } catch {}
     await deleteProductFromDB(id)
     loadProducts()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
+    if (!formData.name.trim()) return setError('Product name is required')
+    if (!formData.barcode.trim()) return setError('Barcode is required')
+    if (!formData.selling_price || parseFloat(formData.selling_price) <= 0) 
+      return setError('Selling price must be greater than 0')
+    if (formData.cost_price && parseFloat(formData.cost_price) < 0) 
+      return setError('Cost price cannot be negative')
+    if (formData.stock && parseInt(formData.stock) < 0) 
+      return setError('Stock cannot be negative')
+
+    // Check barcode uniqueness
+    if (!editingProduct || editingProduct.barcode !== formData.barcode) {
+      const existing = await getProductByBarcode(formData.barcode)
+      if (existing && existing.id !== editingProduct?.id) 
+        return setError(`Barcode already used by: ${existing.name}`)
+    }
+
     setSaving(true)
-    const data = {
-      name: formData.name, sku: formData.sku || null, barcode: formData.barcode,
-      unit: formData.unit || null, brand: formData.brand || null, category: formData.category || null, category_id: null, brand_id: null,
-      cost_price: parseFloat(formData.cost_price),
+    const now = new Date().toISOString()
+    const branchId = getActiveBranchId()
+
+    // Build clean product object — only columns that exist in schema
+    const productData: any = {
+      name: formData.name.trim(),
+      sku: formData.sku.trim() || null,
+      barcode: formData.barcode.trim(),
+      category_id: null,
+      brand_id: null,
+      unit: formData.unit.trim() || null,
+      cost_price: parseFloat(formData.cost_price) || 0,
       selling_price: parseFloat(formData.selling_price),
       tax_rate: parseFloat(formData.tax_rate) || 0,
-      stock: parseInt(formData.stock), minimum_stock: parseInt(formData.minimum_stock) || 0,
-      image_url: lookupImageUrl || null, branch_id: getActiveBranchId() || null, archived: false,
-      created_at: editingProduct?.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      stock: parseInt(formData.stock) || 0,
+      minimum_stock: parseInt(formData.minimum_stock) || 10,
+      image_url: formData.image_url.trim() || null,
+      archived: false,
+      updated_at: now,
     }
+    // Add branch if it exists (multi-branch support)
+    if (branchId) productData.branch_id = branchId
+
+    // Add text brand/category if those columns exist (migration 001 may not be run yet)
+    // We'll try with them and retry without if Supabase rejects
+    const productDataWithMeta = {
+      ...productData,
+      brand: formData.brand.trim() || null,
+      category: formData.category.trim() || null,
+    }
+
     try {
       const { supabase } = await import('@/lib/supabase')
-      if (editingProduct) {
-        await supabase.from('products').update(data).eq('id', editingProduct.id)
-        await updateProductInDB({ ...data, id: editingProduct.id })
-      } else {
-        const id = crypto.randomUUID()
-        await supabase.from('products').insert({ ...data, id })
-        await addProductToDB({ ...data, id })
+      
+      const tryInsert = async (data: any) => {
+        if (editingProduct) {
+          const { error } = await supabase.from('products').update(data).eq('id', editingProduct.id)
+          return error
+        } else {
+          const id = crypto.randomUUID()
+          const { error } = await supabase.from('products').insert({ ...data, id, created_at: now })
+          if (!error) await addProductToDB({ ...data, id, created_at: now })
+          return error
+        }
       }
-    } catch (_) {
+
+      // Try with brand/category first
+      let err = await tryInsert(productDataWithMeta)
+
+      // If failed (columns don't exist yet), retry without
+      if (err) {
+        err = await tryInsert(productData)
+        if (err) throw err
+      }
+
       if (editingProduct) {
-        await updateProductInDB({ ...data, id: editingProduct.id })
+        await updateProductInDB({ ...productDataWithMeta, id: editingProduct.id, created_at: editingProduct.created_at })
+      }
+    } catch (err: any) {
+      console.error('Supabase save failed, using IndexedDB:', err?.message)
+      // Offline fallback
+      if (editingProduct) {
+        await updateProductInDB({ ...productDataWithMeta, id: editingProduct.id, created_at: editingProduct.created_at })
       } else {
-        await addProductToDB({ ...data, id: crypto.randomUUID() })
+        await addProductToDB({ ...productDataWithMeta, id: crypto.randomUUID(), created_at: now })
       }
     }
+
     setSaving(false)
     setShowModal(false)
     loadProducts()
   }
 
-  const lowStock = products.filter(p => p.stock < (p.minimum_stock || 10) && !p.archived)
+  const totalProducts = products.filter(p => !p.archived).length
+  const lowStockCount = products.filter(p => !p.archived && p.stock > 0 && p.stock <= (p.minimum_stock || 10)).length
+  const outOfStockCount = products.filter(p => !p.archived && p.stock === 0).length
 
   return (
-    <>
-      <div className="space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{products.length} products</p>
-          </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 text-sm font-medium shadow-sm">
-            <Plus className="w-4 h-4" /> Add Product
+    <div className="space-y-4 md:space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Inventory</h1>
+          <p className="text-gray-500 text-sm mt-0.5">{totalProducts} products</p>
+        </div>
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 font-semibold text-sm"
+        >
+          <Plus className="h-4 w-4" />
+          Add Product
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'All Products', value: totalProducts, key: 'all', color: 'blue' },
+          { label: 'Low Stock', value: lowStockCount, key: 'low', color: 'yellow' },
+          { label: 'Out of Stock', value: outOfStockCount, key: 'out', color: 'red' },
+        ].map(({ label, value, key, color }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key as any)}
+            className={`bg-white rounded-xl p-3 text-center border-2 transition-all shadow-sm ${
+              filter === key 
+                ? `border-${color}-500 bg-${color}-50` 
+                : 'border-transparent hover:border-gray-200'
+            }`}
+          >
+            <p className={`text-xl font-bold ${
+              key === 'low' ? 'text-yellow-600' : key === 'out' ? 'text-red-600' : 'text-gray-900'
+            }`}>{value}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{label}</p>
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Low Stock Alert */}
-        {lowStock.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-amber-900 text-sm">Low Stock Alert</p>
-              <p className="text-amber-700 text-sm">{lowStock.map(p => p.name).join(', ')}</p>
-            </div>
-          </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search name, barcode, SKU, brand..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+        />
+        {searchTerm && (
+          <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X className="h-4 w-4" />
+          </button>
         )}
+      </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Search name, barcode, SKU..."
-            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Product</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Barcode</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Cost</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Price</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-600">Stock</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-14 text-gray-400">
-                      <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p>{searchTerm ? 'No products match your search' : 'No products yet. Add your first product.'}</p>
-                    </td>
-                  </tr>
-                ) : filteredProducts.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
+      {/* Desktop table */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden hidden md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Product</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Barcode</th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost</th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Margin</th>
+                <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Stock</th>
+                <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {displayedProducts.map((product) => {
+                const margin = product.cost_price > 0
+                  ? (((product.selling_price - product.cost_price) / product.cost_price) * 100).toFixed(0)
+                  : null
+                const stockStatus = product.stock === 0 ? 'out' : product.stock <= (product.minimum_stock||10) ? 'low' : 'ok'
+                return (
+                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        {p.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.image_url} alt={p.name} className="w-9 h-9 rounded-lg object-contain bg-gray-50 border border-gray-200 flex-shrink-0"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-9 h-9 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
                         ) : (
-                          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                            <Package className="w-4 h-4 text-gray-400" />
+                          <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Package className="h-4 w-4 text-blue-400" />
                           </div>
                         )}
                         <div>
-                          <div className="font-medium text-gray-900">{p.name}</div>
-                          {p.sku && <div className="text-xs text-gray-400">{p.sku}</div>}
+                          <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                          {((product as any).brand || product.unit) && (
+                            <p className="text-xs text-gray-400">
+                              {(product as any).brand}{(product as any).brand && product.unit ? ' · ' : ''}{product.unit}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      <button onClick={() => setShowBarcodeModal(p)}
-                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-mono">
-                        <Barcode className="w-3.5 h-3.5" />
-                        {p.barcode || '—'}
-                      </button>
+                    <td className="px-5 py-3.5">
+                      <p className="text-sm font-mono text-gray-700">{product.barcode}</p>
+                      {product.sku && <p className="text-xs text-gray-400">SKU: {product.sku}</p>}
                     </td>
-                    <td className="px-4 py-3 text-right hidden md:table-cell text-gray-500">
-                      KES {Number(p.cost_price).toLocaleString()}
+                    <td className="px-5 py-3.5 text-right">
+                      <p className="text-sm text-gray-600">KES {Number(product.cost_price).toLocaleString()}</p>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                      KES {Number(p.selling_price).toLocaleString()}
+                    <td className="px-5 py-3.5 text-right">
+                      <p className="text-sm font-bold text-gray-900">KES {Number(product.selling_price).toLocaleString()}</p>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        p.stock <= 0 ? 'bg-red-100 text-red-700'
-                        : p.stock < (p.minimum_stock || 10) ? 'bg-amber-100 text-amber-700'
-                        : 'bg-green-100 text-green-700'
+                    <td className="px-5 py-3.5 text-right">
+                      {margin && <span className="text-xs font-medium text-green-600">{margin}%</span>}
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                        stockStatus === 'out' ? 'bg-red-100 text-red-700' :
+                        stockStatus === 'low' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
                       }`}>
-                        {p.stock <= 0 ? 'Out' : p.stock}
+                        {product.stock} {stockStatus !== 'ok' ? `(${stockStatus})` : ''}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => setShowBarcodeModal(p)} className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg sm:hidden">
-                          <Barcode className="w-4 h-4" />
+                        <button onClick={() => openEdit(product)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <Edit className="h-4 w-4" />
                         </button>
-                        <button onClick={() => openEdit(p)} className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(p.id)} className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
+                        <button onClick={() => handleDelete(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                )
+              })}
+            </tbody>
+          </table>
+          {displayedProducts.length === 0 && (
+            <div className="text-center py-16 text-gray-400">
+              <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">No products found</p>
+              <p className="text-xs mt-1">{searchTerm ? 'Try a different search' : 'Click "Add Product" to get started'}</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Barcode modal */}
-      {showBarcodeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Barcode</h3>
-              <button onClick={() => setShowBarcodeModal(null)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-4 font-medium">{showBarcodeModal.name}</p>
-            <div className="flex justify-center bg-white border border-gray-200 rounded-xl p-4 mb-4">
-              <BarcodeDisplay value={showBarcodeModal.barcode} width={220} height={80} />
-            </div>
-            <p className="text-center text-xs text-gray-400 font-mono mb-4">{showBarcodeModal.barcode}</p>
-            <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
-              <Download className="w-4 h-4" /> Print Barcode
-            </button>
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {displayedProducts.length === 0 ? (
+          <div className="bg-white rounded-xl p-10 text-center text-gray-400">
+            <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">No products found</p>
           </div>
-        </div>
-      )}
+        ) : displayedProducts.map((product) => {
+          const stockStatus = product.stock === 0 ? 'out' : product.stock <= (product.minimum_stock||10) ? 'low' : 'ok'
+          return (
+            <div key={product.id} className="bg-white rounded-xl p-4 shadow-sm">
+              <div className="flex items-start gap-3 mb-3">
+                {product.image_url ? (
+                  <img src={product.image_url} alt={product.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-gray-100" />
+                ) : (
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Package className="h-5 w-5 text-blue-400" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm">{product.name}</p>
+                  {(product as any).brand && <p className="text-xs text-gray-400">{(product as any).brand}</p>}
+                  <p className="text-xs text-gray-400 font-mono">{product.barcode}</p>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${
+                  stockStatus === 'out' ? 'bg-red-100 text-red-700' :
+                  stockStatus === 'low' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-green-100 text-green-700'
+                }`}>{product.stock}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-bold text-blue-600">KES {Number(product.selling_price).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">Cost: KES {Number(product.cost_price).toLocaleString()}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => openEdit(product)} className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg font-medium">Edit</button>
+                  <button onClick={() => handleDelete(product.id)} className="px-3 py-1.5 text-sm bg-red-50 text-red-500 rounded-lg font-medium">Delete</button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
-      {/* Add/Edit modal */}
+      {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white w-full sm:rounded-2xl sm:max-w-lg max-h-[97vh] flex flex-col">
+            {/* Modal header */}
             <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
-              <h2 className="font-bold text-gray-900 text-lg">{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
+              <h2 className="text-lg font-bold text-gray-900">
+                {editingProduct ? 'Edit Product' : 'Add New Product'}
+              </h2>
+              <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1">
-              <form onSubmit={handleSubmit} className="space-y-4" id="product-form">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {error && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  {error}
+                </div>
+              )}
 
-                {/* ── STEP 1: Barcode scan ── */}
-                <div className="px-5 pt-4">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Barcode *</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                      <input required type="text" value={formData.barcode}
-                        onChange={e => handleBarcodeChange(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 pr-8"
-                        placeholder="Scan or type barcode" />
-                      {lookingUp && (
-                        <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" />
-                      )}
-                    </div>
-                    <button type="button" onClick={() => { const b = generateBarcode(); setFormData(prev => ({ ...prev, barcode: b })); triggerLookup(b) }}
-                      title="Auto-generate barcode"
-                      className="px-3 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 text-xs font-medium flex items-center gap-1">
-                      <RefreshCw className="w-3.5 h-3.5" /> Gen
-                    </button>
-                    <button type="button" onClick={() => setShowCameraScanner(true)}
-                      title="Scan with camera"
-                      className="px-3 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700">
-                      <Camera className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* STEP 1: Barcode — scan first */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1.5">
+                  Barcode *
+                  <span className="text-xs font-normal text-gray-400 ml-2">Scan first — details auto-fill</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={formData.barcode}
+                    onChange={(e) => onBarcodeChange(e.target.value)}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Scan, or type barcode here..."
+                    autoFocus={!editingProduct}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCameraScanner(true)}
+                    className="px-3 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex-shrink-0"
+                    title="Camera scan"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
                 </div>
 
-                {/* ── Product lookup preview (POS-style) ── */}
-                {lookingUp && (
-                  <div className="mx-5 rounded-2xl bg-gray-900 text-white p-4 flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0 animate-pulse">
-                      <Loader2 className="w-6 h-6 text-white/60 animate-spin" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-blue-400 font-semibold uppercase tracking-wide mb-1">Looking up barcode...</p>
-                      <p className="text-sm text-white/60">Searching product databases</p>
-                    </div>
+                {/* Lookup states */}
+                {lookupLoading && (
+                  <div className="mt-3 flex items-center gap-3 bg-gray-900 text-white rounded-xl p-3.5 animate-pulse">
+                    <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+                    <span className="text-sm">Looking up barcode online...</span>
                   </div>
                 )}
 
-                {!lookingUp && lookupResult && (
-                  <div className="mx-5 rounded-2xl bg-gray-900 text-white overflow-hidden">
-                    <div className="flex items-stretch">
-                      {/* Product image — large and prominent */}
-                      <div className="w-24 flex-shrink-0 bg-white flex items-center justify-center p-2">
-                        {lookupResult.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={lookupResult.imageUrl}
-                            alt={lookupResult.name}
-                            className="w-full h-20 object-contain"
-                            onError={e => {
-                              const el = e.target as HTMLImageElement
-                              el.style.display = 'none'
-                              el.parentElement!.innerHTML = `<div class="w-20 h-20 flex items-center justify-center"><span class="text-gray-400 text-3xl font-bold">${lookupResult!.name.charAt(0)}</span></div>`
-                            }}
-                          />
-                        ) : (
-                          <div className="w-20 h-20 flex items-center justify-center">
-                            <span className="text-gray-400 text-3xl font-bold">{lookupResult.name.charAt(0)}</span>
-                          </div>
-                        )}
-                      </div>
-                      {/* Product details */}
-                      <div className="flex-1 p-4 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                          <span className="text-xs font-semibold text-green-400 uppercase tracking-wide">Found · {lookupResult.source}</span>
+                {lookupResult && !lookupLoading && (
+                  <div className="mt-3 bg-gray-900 rounded-xl overflow-hidden">
+                    <div className="flex gap-3 p-3.5">
+                      {lookupResult.imageUrl ? (
+                        <img
+                          src={lookupResult.imageUrl}
+                          alt={lookupResult.name}
+                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0 bg-white"
+                          onError={(e) => { (e.target as any).style.display = 'none' }}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <ImageOff className="h-6 w-6 text-gray-500" />
                         </div>
-                        <p className="text-base font-bold text-white leading-snug">{lookupResult.name}</p>
-                        {lookupResult.brand && (
-                          <p className="text-sm text-white/60 mt-0.5">{lookupResult.brand}</p>
-                        )}
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
+                          <span className="text-xs text-green-400 font-medium">Found — fields auto-filled ↓</span>
+                        </div>
+                        <p className="font-bold text-white text-sm leading-tight">{lookupResult.name}</p>
+                        {lookupResult.brand && <p className="text-xs text-gray-400 mt-0.5">{lookupResult.brand}</p>}
                         {lookupResult.category && (
-                          <span className="inline-block mt-1.5 text-xs bg-white/10 text-white/70 px-2 py-0.5 rounded-full">{lookupResult.category}</span>
+                          <span className="mt-1 inline-block text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                            {lookupResult.category}
+                          </span>
                         )}
-                        <p className="text-xs text-white/40 mt-2">Fields auto-filled ↓ just add prices &amp; stock</p>
                       </div>
                     </div>
+                    <div className="px-3.5 pb-2 text-xs text-gray-500">
+                      Source: {lookupResult.source} · Set prices & stock below
+                    </div>
                   </div>
                 )}
 
-                {!lookingUp && !lookupResult && formData.barcode.length >= 8 && !editingProduct && (
-                  <div className="mx-5 flex items-center gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>No online match — fill all details manually below</span>
+                {lookupNotFound && !lookupLoading && formData.barcode.length >= 6 && (
+                  <div className="mt-3 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm text-amber-700">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    No online match — fill details manually below
                   </div>
                 )}
+              </div>
 
-                <div className="px-5 pb-4 space-y-4">
+              {/* Product Name */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1.5">Product Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g. Coca-Cola 500ml"
+                />
+              </div>
 
-                  {/* Barcode mini preview */}
-                  {formData.barcode && (
-                    <div className="p-2 bg-gray-50 rounded-xl flex justify-center border border-gray-100">
-                      <BarcodeDisplay value={formData.barcode} width={180} height={55} />
-                    </div>
-                  )}
-
-                  {/* Product Name */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Product Name *</label>
-                    <input required type="text" value={formData.name}
-                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g. Coca Cola 500ml" />
-                  </div>
-
-                  {/* Brand & Category */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Brand</label>
-                      <input type="text" value={formData.brand}
-                        onChange={e => setFormData(prev => ({ ...prev, brand: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g. Coca Cola" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Category</label>
-                      <input type="text" value={formData.category}
-                        onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g. Beverages" />
-                    </div>
-                  </div>
-
-                  {/* SKU & Unit */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">SKU</label>
-                      <input type="text" value={formData.sku}
-                        onChange={e => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Optional" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Unit / Size</label>
-                      <input type="text" value={formData.unit}
-                        onChange={e => setFormData(prev => ({ ...prev, unit: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="pcs, kg, 500ml" />
-                    </div>
-                  </div>
-
-                  {/* Prices */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Cost Price (KES) *</label>
-                      <input required type="number" step="0.01" min="0" value={formData.cost_price}
-                        onChange={e => setFormData(prev => ({ ...prev, cost_price: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Selling Price (KES) *</label>
-                      <input required type="number" step="0.01" min="0" value={formData.selling_price}
-                        onChange={e => setFormData(prev => ({ ...prev, selling_price: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="0.00" />
-                    </div>
-                  </div>
-
-                  {/* Stock */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Stock Qty *</label>
-                      <input required type="number" min="0" value={formData.stock}
-                        onChange={e => setFormData(prev => ({ ...prev, stock: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Min Stock Alert</label>
-                      <input type="number" min="0" value={formData.minimum_stock}
-                        onChange={e => setFormData(prev => ({ ...prev, minimum_stock: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="5" />
-                    </div>
-                  </div>
-
-                  {/* Tax rate */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Tax Rate (%)</label>
-                    <input type="number" step="0.1" min="0" max="100" value={formData.tax_rate}
-                      onChange={e => setFormData(prev => ({ ...prev, tax_rate: e.target.value }))}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0 = no tax, 16 = VAT" />
-                  </div>
-
+              {/* Brand + Category */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Brand</label>
+                  <input
+                    type="text"
+                    value={formData.brand}
+                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Coca-Cola"
+                  />
                 </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Category</label>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Beverages"
+                  />
+                </div>
+              </div>
 
-              </form>
+              {/* SKU + Unit */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">SKU (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. SKU-001"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Unit / Size</label>
+                  <input
+                    type="text"
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="500ml, 1kg, pcs"
+                  />
+                </div>
+              </div>
+
+              {/* Prices */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Cost Price (KES) *</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    min="0"
+                    value={formData.cost_price}
+                    onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Selling Price (KES) *</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    min="0.01"
+                    value={formData.selling_price}
+                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Margin preview */}
+              {formData.cost_price && formData.selling_price && parseFloat(formData.cost_price) > 0 && parseFloat(formData.selling_price) > 0 && (
+                <div className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                  parseFloat(formData.selling_price) >= parseFloat(formData.cost_price)
+                    ? 'bg-green-50 text-green-700 border border-green-100'
+                    : 'bg-red-50 text-red-700 border border-red-100'
+                }`}>
+                  {parseFloat(formData.selling_price) >= parseFloat(formData.cost_price) ? '✓' : '⚠'}{' '}
+                  Profit: KES {(parseFloat(formData.selling_price) - parseFloat(formData.cost_price)).toLocaleString()}{' '}
+                  ({(((parseFloat(formData.selling_price) - parseFloat(formData.cost_price)) / parseFloat(formData.cost_price)) * 100).toFixed(1)}% margin)
+                  {parseFloat(formData.selling_price) < parseFloat(formData.cost_price) && ' — selling below cost!'}
+                </div>
+              )}
+
+              {/* Stock */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Stock Quantity *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Low Stock Alert</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.minimum_stock}
+                    onChange={(e) => setFormData({ ...formData, minimum_stock: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="10"
+                  />
+                </div>
+              </div>
+
+              {/* Tax rate */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1.5">Tax Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={formData.tax_rate}
+                  onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-400 mt-1">VAT in Kenya is 16%. Leave 0 if price already includes tax.</p>
+              </div>
+
+              {/* Product Image URL (auto-filled from lookup) */}
+              {formData.image_url && (
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Product Image</label>
+                  <div className="flex gap-3 items-center">
+                    <img src={formData.image_url} alt="Product" className="w-16 h-16 rounded-xl object-cover border border-gray-200" 
+                      onError={(e) => { (e.target as any).style.display='none' }} />
+                    <div className="flex-1">
+                      <input
+                        type="url"
+                        value={formData.image_url}
+                        onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://..."
+                      />
+                      <button type="button" onClick={() => setFormData({ ...formData, image_url: '' })} className="text-xs text-red-500 mt-1 hover:underline">
+                        Remove image
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="px-5 py-4 border-t flex gap-3 flex-shrink-0">
-              <button type="button" onClick={() => setShowModal(false)}
-                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            {/* Footer */}
+            <div className="px-5 pb-5 pt-3 border-t flex gap-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-3 border border-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50"
+              >
                 Cancel
               </button>
-              <button type="submit" form="product-form" disabled={saving}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-                {saving ? 'Saving...' : editingProduct ? 'Update' : 'Add Product'}
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <><Loader2 className="animate-spin h-4 w-4" /> Saving...</>
+                ) : (
+                  editingProduct ? 'Update Product' : 'Add Product'
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Camera Scanner */}
       {showCameraScanner && (
-        <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowCameraScanner(false)} continuous={false} />
+        <BarcodeScanner
+          onScan={handleBarcodeScan}
+          onClose={() => setShowCameraScanner(false)}
+          continuous={false}
+          showFlashlight={true}
+        />
       )}
-    </>
+    </div>
+  )
+}
+
+function Package({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+    </svg>
   )
 }

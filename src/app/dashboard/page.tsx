@@ -2,35 +2,20 @@
 
 import { useEffect, useState } from 'react'
 import { getCurrentAuthUser } from '@/lib/auth'
+import Link from 'next/link'
 import { 
-  DollarSign, 
-  ShoppingCart, 
-  Package, 
-  TrendingUp,
-  AlertCircle,
-  TrendingDown
+  DollarSign, ShoppingCart, Package, TrendingUp,
+  AlertCircle, TrendingDown, ArrowRight, Activity
 } from 'lucide-react'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [stats, setStats] = useState({
-    todaySales: 0,
-    todayRevenue: 0,
-    todayProfit: 0,
-    weeklyRevenue: 0,
-    monthlyRevenue: 0,
-    yearlyRevenue: 0,
-    totalProducts: 0,
-    lowStockItems: 0,
-    outOfStockItems: 0,
+    todaySales: 0, todayRevenue: 0, todayProfit: 0,
+    weeklyRevenue: 0, monthlyRevenue: 0,
+    totalProducts: 0, lowStockItems: 0, outOfStockItems: 0,
     averageTransactionValue: 0,
-    todaySalesChange: 0,
-    todayRevenueChange: 0,
-    todayProfitChange: 0,
-    weeklyRevenueChange: 0,
-    monthlyRevenueChange: 0,
-    yearlyRevenueChange: 0,
-    totalProductsChange: 0
+    todaySalesChange: 0, todayRevenueChange: 0,
   })
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
   const [topProducts, setTopProducts] = useState<any[]>([])
@@ -41,287 +26,152 @@ export default function DashboardPage() {
     loadStats()
   }, [])
 
-  const loadUserData = () => {
-    const currentUser = getCurrentAuthUser()
-    setUser(currentUser)
+  const loadUserData = async () => {
+    setUser(await getCurrentAuthUser())
   }
 
   const loadStats = async () => {
     setLoading(true)
     try {
       const { supabase } = await import('@/lib/supabase')
-      
-      // Get today's date range
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      const yesterday = new Date(today)
-      yesterday.setDate(yesterday.getDate() - 1)
-      
-      const weekAgo = new Date(today)
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      
-      const lastWeekStart = new Date(weekAgo)
-      lastWeekStart.setDate(lastWeekStart.getDate() - 7)
-      
-      const monthAgo = new Date(today)
-      monthAgo.setMonth(monthAgo.getMonth() - 1)
-      
-      const lastMonthStart = new Date(monthAgo)
-      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1)
-      
-      const yearAgo = new Date(today)
-      yearAgo.setFullYear(yearAgo.getFullYear() - 1)
-      
-      const lastYearStart = new Date(yearAgo)
-      lastYearStart.setFullYear(lastYearStart.getFullYear() - 1)
-      
-      // Get sales data
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .select('*, sale_items(*, products(*))')
-        .gte('created_at', yearAgo.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(50)
-      
-      // Get products data
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-      
-      if (!salesError && salesData && !productsError && productsData) {
-        // Calculate stats
+      const today = new Date(); today.setHours(0,0,0,0)
+      const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1)
+      const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate()-7)
+      const monthAgo = new Date(today); monthAgo.setMonth(monthAgo.getMonth()-1)
+
+      const [{ data: salesData }, { data: productsData }] = await Promise.all([
+        supabase.from('sales').select('*, sale_items(*, products(*))').gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: false }),
+        supabase.from('products').select('id, stock, minimum_stock, cost_price, name').eq('archived', false)
+      ])
+
+      if (salesData && productsData) {
         const todaySales = salesData.filter(s => new Date(s.created_at) >= today)
         const yesterdaySales = salesData.filter(s => new Date(s.created_at) >= yesterday && new Date(s.created_at) < today)
         const weeklySales = salesData.filter(s => new Date(s.created_at) >= weekAgo)
-        const lastWeekSales = salesData.filter(s => new Date(s.created_at) >= lastWeekStart && new Date(s.created_at) < weekAgo)
-        const monthlySales = salesData.filter(s => new Date(s.created_at) >= monthAgo)
-        const lastMonthSales = salesData.filter(s => new Date(s.created_at) >= lastMonthStart && new Date(s.created_at) < monthAgo)
-        const yearlySales = salesData
-        const lastYearSales = salesData.filter(s => new Date(s.created_at) >= lastYearStart && new Date(s.created_at) < yearAgo)
-        
-        const todayRevenue = todaySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const yesterdayRevenue = yesterdaySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const weeklyRevenue = weeklySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const lastWeekRevenue = lastWeekSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const lastMonthRevenue = lastMonthSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const yearlyRevenue = yearlySales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        const lastYearRevenue = lastYearSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-        
-        // Calculate profit (revenue - cost)
+
+        const todayRevenue = todaySales.reduce((s, x) => s + Number(x.total_amount), 0)
+        const yesterdayRevenue = yesterdaySales.reduce((s, x) => s + Number(x.total_amount), 0)
+        const weeklyRevenue = weeklySales.reduce((s, x) => s + Number(x.total_amount), 0)
+        const monthlyRevenue = salesData.reduce((s, x) => s + Number(x.total_amount), 0)
+
         let todayCost = 0
-        let yesterdayCost = 0
         todaySales.forEach(sale => {
           sale.sale_items?.forEach((item: any) => {
-            if (item.products) {
-              todayCost += (item.products.cost_price || 0) * item.quantity
-            }
+            if (item.products) todayCost += (item.products.cost_price||0)*item.quantity
           })
         })
-        yesterdaySales.forEach(sale => {
-          sale.sale_items?.forEach((item: any) => {
-            if (item.products) {
-              yesterdayCost += (item.products.cost_price || 0) * item.quantity
-            }
-          })
-        })
-        const todayProfit = todayRevenue - todayCost
-        const yesterdayProfit = yesterdayRevenue - yesterdayCost
-        
-        const totalProducts = productsData.length
-        const lowStockItems = productsData.filter(p => p.stock > 0 && p.stock < 10).length
-        const outOfStockItems = productsData.filter(p => p.stock === 0).length
-        
-        const averageTransactionValue = todaySales.length > 0 
-          ? todayRevenue / todaySales.length 
-          : 0
-        
-        // Get recent transactions
-        const recent = salesData.slice(0, 10).map(sale => ({
-          id: sale.receipt_pin,
-          items: sale.sale_items?.length || 0,
-          total: Number(sale.total_amount),
-          method: sale.payment_method,
-          time: new Date(sale.created_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
-        }))
-        
-        // Get top products
-        const productSales = new Map<string, { sold: number; revenue: number }>()
+
+        const productSales = new Map<string, {sold:number;revenue:number}>()
         salesData.forEach(sale => {
           sale.sale_items?.forEach((item: any) => {
-            const productName = item.products?.name || 'Unknown'
-            const current = productSales.get(productName) || { sold: 0, revenue: 0 }
-            productSales.set(productName, {
-              sold: current.sold + item.quantity,
-              revenue: current.revenue + (item.price * item.quantity)
-            })
+            const n = item.products?.name || 'Unknown'
+            const cur = productSales.get(n)||{sold:0,revenue:0}
+            productSales.set(n, { sold: cur.sold+item.quantity, revenue: cur.revenue+(item.price*item.quantity) })
           })
         })
-        
-        const topProductsArray = Array.from(productSales.entries())
-          .map(([name, data]) => ({ name, ...data }))
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 5)
-        
-        // Calculate percentage changes
-        const todaySalesChange = yesterdaySales.length > 0 
-          ? ((todaySales.length - yesterdaySales.length) / yesterdaySales.length) * 100 
-          : 0
-        
-        const todayRevenueChange = yesterdayRevenue > 0 
-          ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
-          : 0
-        
-        const todayProfitChange = yesterdayProfit > 0 
-          ? ((todayProfit - yesterdayProfit) / yesterdayProfit) * 100 
-          : 0
-        
-        const weeklyRevenueChange = lastWeekRevenue > 0 
-          ? ((weeklyRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 
-          : 0
-        
-        const monthlyRevenueChange = lastMonthRevenue > 0 
-          ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
-          : 0
-        
-        const yearlyRevenueChange = lastYearRevenue > 0 
-          ? ((yearlyRevenue - lastYearRevenue) / lastYearRevenue) * 100 
-          : 0
-        
-        const totalProductsChange = 0 // Products don't change much, can be calculated if needed
-        
+
         setStats({
           todaySales: todaySales.length,
           todayRevenue,
-          todayProfit,
+          todayProfit: todayRevenue - todayCost,
           weeklyRevenue,
           monthlyRevenue,
-          yearlyRevenue,
-          totalProducts,
-          lowStockItems,
-          outOfStockItems,
-          averageTransactionValue,
-          todaySalesChange,
-          todayRevenueChange,
-          todayProfitChange,
-          weeklyRevenueChange,
-          monthlyRevenueChange,
-          yearlyRevenueChange,
-          totalProductsChange
+          totalProducts: productsData.length,
+          lowStockItems: productsData.filter(p => p.stock > 0 && p.stock <= (p.minimum_stock||10)).length,
+          outOfStockItems: productsData.filter(p => p.stock === 0).length,
+          averageTransactionValue: todaySales.length ? todayRevenue/todaySales.length : 0,
+          todaySalesChange: yesterdaySales.length ? ((todaySales.length-yesterdaySales.length)/yesterdaySales.length)*100 : 0,
+          todayRevenueChange: yesterdayRevenue ? ((todayRevenue-yesterdayRevenue)/yesterdayRevenue)*100 : 0,
         })
-        setRecentTransactions(recent)
-        setTopProducts(topProductsArray)
-        return
+        setRecentTransactions(salesData.slice(0,8).map(s => ({
+          id: s.receipt_pin, items: s.sale_items?.length||0,
+          total: Number(s.total_amount), method: s.payment_method,
+          time: new Date(s.created_at).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})
+        })))
+        setTopProducts(Array.from(productSales.entries())
+          .map(([name,data]) => ({name,...data}))
+          .sort((a,b) => b.revenue-a.revenue).slice(0,5))
       }
-    } catch (error) {
-      console.log('Error loading stats:', error)
-    } finally {
-      setLoading(false)
-    }
+    } catch(e) { console.log('Stats error:', e) }
+    finally { setLoading(false) }
   }
 
-  const statCards = [
-    {
-      title: 'Today Sales',
-      value: stats.todaySales,
-      icon: ShoppingCart,
-      color: 'blue',
-      change: stats.todaySalesChange >= 0 ? `+${stats.todaySalesChange.toFixed(1)}%` : `${stats.todaySalesChange.toFixed(1)}%`
-    },
-    {
-      title: 'Today Revenue',
-      value: `KES ${stats.todayRevenue.toLocaleString()}`,
-      icon: DollarSign,
-      color: 'green',
-      change: stats.todayRevenueChange >= 0 ? `+${stats.todayRevenueChange.toFixed(1)}%` : `${stats.todayRevenueChange.toFixed(1)}%`
-    },
-    {
-      title: 'Today Profit',
-      value: `KES ${stats.todayProfit.toLocaleString()}`,
-      icon: TrendingUp,
-      color: 'purple',
-      change: stats.todayProfitChange >= 0 ? `+${stats.todayProfitChange.toFixed(1)}%` : `${stats.todayProfitChange.toFixed(1)}%`
-    },
-    {
-      title: 'Avg Transaction',
-      value: `KES ${Math.round(stats.averageTransactionValue).toLocaleString()}`,
-      icon: DollarSign,
-      color: 'indigo',
-      change: '+0%' // Average transaction doesn't have a meaningful period comparison
-    },
-    {
-      title: 'Weekly Revenue',
-      value: `KES ${stats.weeklyRevenue.toLocaleString()}`,
-      icon: TrendingUp,
-      color: 'teal',
-      change: stats.weeklyRevenueChange >= 0 ? `+${stats.weeklyRevenueChange.toFixed(1)}%` : `${stats.weeklyRevenueChange.toFixed(1)}%`
-    },
-    {
-      title: 'Monthly Revenue',
-      value: `KES ${stats.monthlyRevenue.toLocaleString()}`,
-      icon: TrendingUp,
-      color: 'emerald',
-      change: stats.monthlyRevenueChange >= 0 ? `+${stats.monthlyRevenueChange.toFixed(1)}%` : `${stats.monthlyRevenueChange.toFixed(1)}%`
-    },
-    {
-      title: 'Yearly Revenue',
-      value: `KES ${stats.yearlyRevenue.toLocaleString()}`,
-      icon: TrendingUp,
-      color: 'cyan',
-      change: stats.yearlyRevenueChange >= 0 ? `+${stats.yearlyRevenueChange.toFixed(1)}%` : `${stats.yearlyRevenueChange.toFixed(1)}%`
-    },
-    {
-      title: 'Total Products',
-      value: stats.totalProducts,
-      icon: Package,
-      color: 'orange',
-      change: '+0%' // Products don't change much, can be calculated if needed
-    }
-  ]
+  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString()}`
+  const pct = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(1) + '%'
 
-  const colorClasses: Record<string, string> = {
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    purple: 'bg-purple-500',
-    red: 'bg-red-500',
-    indigo: 'bg-indigo-500',
-    teal: 'bg-teal-500',
-    emerald: 'bg-emerald-500',
-    cyan: 'bg-cyan-500',
-    orange: 'bg-orange-500'
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-600 border-t-transparent" />
+    </div>
+  )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome back, {user?.name}!</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Welcome back, {user?.name}</p>
+        </div>
+        <Link href="/pos" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
+          <ShoppingCart className="h-4 w-4" />
+          <span>Open POS</span>
+        </Link>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat) => {
-          const Icon = stat.icon
+      {/* Alerts */}
+      {(stats.lowStockItems > 0 || stats.outOfStockItems > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {stats.lowStockItems > 0 && (
+            <Link href="/inventory?filter=low" className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3.5 hover:bg-yellow-100 transition-colors">
+              <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-yellow-900">Low Stock</p>
+                <p className="text-xs text-yellow-700">{stats.lowStockItems} products need restocking</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+            </Link>
+          )}
+          {stats.outOfStockItems > 0 && (
+            <Link href="/inventory?filter=out" className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-3.5 hover:bg-red-100 transition-colors">
+              <TrendingDown className="h-5 w-5 text-red-600 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-900">Out of Stock</p>
+                <p className="text-xs text-red-700">{stats.outOfStockItems} products unavailable</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-red-600 flex-shrink-0" />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Today's Sales", value: stats.todaySales.toString(), sub: pct(stats.todaySalesChange)+' vs yesterday', icon: ShoppingCart, color: 'blue', trend: stats.todaySalesChange },
+          { label: "Today's Revenue", value: fmt(stats.todayRevenue), sub: pct(stats.todayRevenueChange)+' vs yesterday', icon: DollarSign, color: 'green', trend: stats.todayRevenueChange },
+          { label: "Today's Profit", value: fmt(stats.todayProfit), sub: 'Revenue minus cost', icon: TrendingUp, color: 'purple', trend: stats.todayProfit },
+          { label: 'Avg Transaction', value: fmt(stats.averageTransactionValue), sub: 'Today', icon: Activity, color: 'orange', trend: 0 },
+        ].map((card) => {
+          const Icon = card.icon
+          const colorMap: Record<string, string> = {
+            blue: 'bg-blue-500', green: 'bg-green-500', purple: 'bg-purple-500', orange: 'bg-orange-500'
+          }
+          const bgLight: Record<string, string> = {
+            blue: 'bg-blue-50', green: 'bg-green-50', purple: 'bg-purple-50', orange: 'bg-orange-50'
+          }
           return (
-            <div key={stat.title} className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                  <p className="text-sm text-green-600 mt-1">{stat.change}</p>
+            <div key={card.label} className="bg-white rounded-xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 truncate">{card.label}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1 truncate">{card.value}</p>
+                  <p className={`text-xs mt-1 font-medium ${card.trend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {card.sub}
+                  </p>
                 </div>
-                <div className={`${colorClasses[stat.color as keyof typeof colorClasses]} p-3 rounded-lg`}>
-                  <Icon className="h-6 w-6 text-white" />
+                <div className={`${bgLight[card.color]} p-2.5 rounded-xl flex-shrink-0`}>
+                  <Icon className={`h-4 w-4 text-${card.color}-600`} />
                 </div>
               </div>
             </div>
@@ -329,90 +179,83 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Stock Alerts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {stats.lowStockItems > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-            <div className="flex items-center space-x-3">
-              <AlertCircle className="h-6 w-6 text-yellow-600" />
-              <div>
-                <h3 className="font-semibold text-yellow-900">Low Stock Alert</h3>
-                <p className="text-yellow-700 text-sm">
-                  {stats.lowStockItems} products are running low on stock. Check inventory for details.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {stats.outOfStockItems > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-            <div className="flex items-center space-x-3">
-              <TrendingDown className="h-6 w-6 text-red-600" />
-              <div>
-                <h3 className="font-semibold text-red-900">Out of Stock</h3>
-                <p className="text-red-700 text-sm">
-                  {stats.outOfStockItems} products are out of stock. Restock immediately.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Revenue overview */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">Weekly Revenue</p>
+          <p className="text-xl font-bold text-gray-900 mt-1">{fmt(stats.weeklyRevenue)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Last 7 days</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">Monthly Revenue</p>
+          <p className="text-xl font-bold text-gray-900 mt-1">{fmt(stats.monthlyRevenue)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Last 30 days</p>
+        </div>
       </div>
 
-      {/* Recent Transactions & Top Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Transactions */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h2>
-          <div className="space-y-3">
-            {recentTransactions.length > 0 ? (
-              recentTransactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">{transaction.id}</p>
-                    <p className="text-sm text-gray-600">{transaction.items} items • {transaction.time}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">KES {transaction.total.toLocaleString()}</p>
-                    <p className="text-sm text-gray-600 capitalize">{transaction.method}</p>
-                  </div>
+      {/* Inventory quick stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <Link href="/inventory" className="bg-white rounded-xl p-4 shadow-sm text-center hover:bg-gray-50 transition-colors">
+          <Package className="h-5 w-5 text-blue-500 mx-auto mb-1" />
+          <p className="text-xl font-bold text-gray-900">{stats.totalProducts}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Products</p>
+        </Link>
+        <Link href="/inventory" className="bg-white rounded-xl p-4 shadow-sm text-center hover:bg-yellow-50 transition-colors">
+          <AlertCircle className="h-5 w-5 text-yellow-500 mx-auto mb-1" />
+          <p className="text-xl font-bold text-yellow-600">{stats.lowStockItems}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Low Stock</p>
+        </Link>
+        <Link href="/inventory" className="bg-white rounded-xl p-4 shadow-sm text-center hover:bg-red-50 transition-colors">
+          <TrendingDown className="h-5 w-5 text-red-500 mx-auto mb-1" />
+          <p className="text-xl font-bold text-red-600">{stats.outOfStockItems}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Out of Stock</p>
+        </Link>
+      </div>
+
+      {/* Recent + Top Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-900 text-sm">Recent Sales</h2>
+            <Link href="/sales-history" className="text-xs text-blue-600 hover:underline font-medium">View all</Link>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {recentTransactions.length === 0 ? (
+              <div className="text-center py-10 text-gray-400 text-sm">No sales yet today</div>
+            ) : recentTransactions.map((t) => (
+              <div key={t.id} className="flex items-center justify-between px-5 py-3">
+                <div>
+                  <p className="text-sm font-mono font-medium text-gray-900">{t.id}</p>
+                  <p className="text-xs text-gray-400">{t.items} item{t.items!==1?'s':''} · {t.time}</p>
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">No transactions yet</p>
-            )}
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-900">KES {t.total.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 capitalize">{t.method?.replace(/_/g,' ')}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Top Products */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Products (All Time)</h2>
-          <div className="space-y-3">
-            {topProducts.length > 0 ? (
-              topProducts.map((product, index) => (
-                <div
-                  key={product.name}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm">
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{product.name}</p>
-                      <p className="text-sm text-gray-600">{product.sold} sold</p>
-                    </div>
-                  </div>
-                  <p className="font-semibold text-gray-900">KES {product.revenue.toLocaleString()}</p>
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-900 text-sm">Top Products (Month)</h2>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {topProducts.length === 0 ? (
+              <div className="text-center py-10 text-gray-400 text-sm">No sales data yet</div>
+            ) : topProducts.map((p, i) => (
+              <div key={p.name} className="flex items-center gap-3 px-5 py-3">
+                <span className="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {i+1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                  <p className="text-xs text-gray-400">{p.sold} sold</p>
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">No sales data yet</p>
-            )}
+                <p className="text-sm font-bold text-gray-900 flex-shrink-0">KES {p.revenue.toLocaleString()}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

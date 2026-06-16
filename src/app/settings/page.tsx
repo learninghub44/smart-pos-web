@@ -79,7 +79,7 @@ export default function SettingsPage() {
   }
 
   const handleDeleteStaff = async (id: string, name: string) => {
-    if (!confirm(\`Remove \${name} from the system?\`)) return
+    if (!confirm(`Remove ${name} from the system?`)) return
     try {
       const { supabase } = await import('@/lib/supabase')
       await supabase.from('users').delete().eq('id', id)

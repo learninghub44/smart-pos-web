@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, MapPin, Phone, Mail, CheckCircle, XCircle, X, Building2, Users } from 'lucide-react'
 import { getCurrentAuthUser, isOwner } from '@/lib/auth'
