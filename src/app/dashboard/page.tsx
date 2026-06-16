@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const [topProducts, setTopProducts] = useState<any[]>([])
 
   useEffect(() => {
-    getCurrentAuthUser().then(u => setUser(u))
+    ;(async () => { const u = await getCurrentAuthUser(); if (u) setUser(u) })()
     load()
   }, [])
 
