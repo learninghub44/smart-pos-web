@@ -21,8 +21,8 @@ interface Product {
   barcode: string
   category_id: string | null
   brand_id: string | null
-  brand: string | null
-  category: string | null
+  brand?: string | null
+  category?: string | null
   unit: string | null
   cost_price: number
   selling_price: number
