@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff } from 'lucide-react'
+import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings } from 'lucide-react'
 import { getCurrentAuthUser, isOwner, register } from '@/lib/auth'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax' | 'staff'>('business')
+  const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax' | 'staff' | 'system'>('business')
   const [saving, setSaving] = useState(false)
   
   const [businessSettings, setBusinessSettings] = useState({
@@ -216,7 +216,8 @@ export default function SettingsPage() {
     { id: 'business' as const, label: 'Business', icon: Building2 },
     { id: 'receipt' as const, label: 'Receipt', icon: Receipt },
     { id: 'tax' as const, label: 'Tax', icon: DollarSign },
-    ...(owner ? [{ id: 'staff' as const, label: 'Staff', icon: Users }] : [])
+    ...(owner ? [{ id: 'staff' as const, label: 'Staff', icon: Users }] : []),
+    { id: 'system' as const, label: 'System', icon: Settings }
   ]
 
   return (
@@ -432,6 +433,86 @@ export default function SettingsPage() {
           )}
 
           {/* Staff Tab */}
+
+          {activeTab === 'system' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">System & Cache</h3>
+                <p className="text-sm text-gray-500">Manage offline cache and local data</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Clear Offline Cache</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Removes all locally cached products, sales, and customers from this browser.
+                      Fresh data will be loaded from the server on next visit.
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Clear all offline cache? This will reload fresh data from the server.')) return
+                      try {
+                        const { clearProductsFromDB } = await import('@/lib/indexeddb')
+                        await clearProductsFromDB()
+                        // Clear all IndexedDB
+                        const dbs = await indexedDB.databases?.() || []
+                        for (const db of dbs) {
+                          if (db.name) indexedDB.deleteDatabase(db.name)
+                        }
+                        alert('Cache cleared. Page will reload.')
+                        window.location.reload()
+                      } catch {
+                        alert('Cache cleared. Page will reload.')
+                        window.location.reload()
+                      }
+                    }}
+                    className="flex-shrink-0 px-4 py-2 bg-orange-600 text-white rounded-xl text-sm font-semibold hover:bg-orange-700 transition-colors"
+                  >
+                    Clear Cache
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white border border-red-200 rounded-xl p-5 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-red-700 text-sm">Force Sync from Server</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Clears local cache and reloads all products fresh from Supabase.
+                      Use this if products are not showing or showing deleted items.
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('This will clear local cache and reload all data from server. Continue?')) return
+                      try {
+                        const { clearProductsFromDB } = await import('@/lib/indexeddb')
+                        await clearProductsFromDB()
+                        alert('Local cache cleared. Go to Inventory to reload products.')
+                      } catch (e) {
+                        alert('Done. Go to Inventory to reload.')
+                      }
+                    }}
+                    className="flex-shrink-0 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Force Sync
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs text-gray-500 font-medium mb-2">TIPS</p>
+                <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
+                  <li>Products deleted on one device may still show on others until cache is cleared</li>
+                  <li>If a barcode says "already exists" for a deleted product, click Force Sync</li>
+                  <li>Cache is per-browser — clear on each device separately</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'staff' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between">

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { 
   getAllProducts, addProductToDB, updateProductInDB, 
-  deleteProductFromDB, getProductByBarcode 
+  deleteProductFromDB, getProductByBarcode, syncProductsFromSupabase 
 } from '@/lib/indexeddb'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -100,19 +100,10 @@ export default function InventoryPage() {
   }
 
   const handleBarcodeScan = async (barcode: string) => {
-    // If in edit mode — check for conflicts
-    if (!editingProduct || editingProduct.barcode !== barcode) {
-      const existing = await getProductByBarcode(barcode)
-      if (existing && existing.id !== editingProduct?.id) {
-        setError(`Barcode already used by: ${existing.name}`)
-        setShowCameraScanner(false)
-        return
-      }
-    }
     setFormData(prev => ({ ...prev, barcode }))
     setShowCameraScanner(false)
     setError(null)
-    // Trigger online lookup
+    // Trigger online lookup immediately
     triggerLookup(barcode)
   }
 
@@ -130,7 +121,7 @@ export default function InventoryPage() {
       const { data, error } = await query
       if (data && !error) {
         setProducts(data)
-        for (const p of data) await updateProductInDB(p)
+        await syncProductsFromSupabase(data)
         return
       }
     } catch {}
@@ -206,11 +197,24 @@ export default function InventoryPage() {
     if (formData.stock && parseInt(formData.stock) < 0) 
       return setError('Stock cannot be negative')
 
-    // Check barcode uniqueness
+    // Check barcode uniqueness — check Supabase first, fall back to IndexedDB
     if (!editingProduct || editingProduct.barcode !== formData.barcode) {
-      const existing = await getProductByBarcode(formData.barcode)
-      if (existing && existing.id !== editingProduct?.id) 
-        return setError(`Barcode already used by: ${existing.name}`)
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const { data: existing } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('barcode', formData.barcode.trim())
+          .eq('archived', false)
+          .single()
+        if (existing && existing.id !== editingProduct?.id)
+          return setError(`Barcode already used by: ${existing.name}`)
+      } catch {
+        // Offline: fall back to IndexedDB
+        const existing = await getProductByBarcode(formData.barcode)
+        if (existing && existing.id !== editingProduct?.id)
+          return setError(`Barcode already used by: ${existing.name}`)
+      }
     }
 
     setSaving(true)

@@ -98,8 +98,8 @@ export default function POSPage() {
         .order('name')
       if (data && !error) {
         setProducts(data)
-        const { updateProductInDB } = await import('@/lib/indexeddb')
-        for (const p of data) await updateProductInDB(p)
+        const { syncProductsFromSupabase } = await import('@/lib/indexeddb')
+        await syncProductsFromSupabase(data)
         return
       }
     } catch {}
