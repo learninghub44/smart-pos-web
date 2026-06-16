@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, Plus, Minus, Trash2, ShoppingCart, Camera, X, Percent, Tag, Printer, CheckCircle, Package } from 'lucide-react'
 import { getAllProducts, getProductByBarcode } from '@/lib/indexeddb'
-import { getCurrentAuthUser } from '@/lib/auth'
+import { getCurrentAuthUser, getActiveBranchId } from '@/lib/auth'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import Receipt from '@/components/Receipt'
@@ -89,7 +89,9 @@ export default function POSPage() {
     setLoading(true)
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase.from('products').select('*').eq('archived', false).order('name')
+      const branchId = getActiveBranchId()
+      const query = supabase.from('products').select('*').eq('archived', false).order('name')
+      const { data, error } = branchId ? await query.eq('branch_id', branchId) : await query
       if (data && !error) {
         setProducts(data)
         setLoading(false)
@@ -167,6 +169,7 @@ export default function POSPage() {
         receipt_pin: receiptPin,
         receipt_number: receiptNumber,
         cashier_id: user?.id || null,
+        branch_id: getActiveBranchId() || null,
         notes: saleNotes || null,
         created_at: new Date().toISOString(),
         synced: false

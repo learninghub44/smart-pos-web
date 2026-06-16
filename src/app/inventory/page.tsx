@@ -124,7 +124,9 @@ export default function InventoryPage() {
   const loadProducts = async () => {
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+      const branchId = getActiveBranchId()
+      const q = supabase.from('products').select('*').order('created_at', { ascending: false })
+      const { data, error } = branchId ? await q.eq('branch_id', branchId) : await q
       if (data && !error) {
         setProducts(data)
         for (const p of data) await updateProductInDB(p)
@@ -185,7 +187,7 @@ export default function InventoryPage() {
       selling_price: parseFloat(formData.selling_price),
       tax_rate: parseFloat(formData.tax_rate) || 0,
       stock: parseInt(formData.stock), minimum_stock: parseInt(formData.minimum_stock) || 0,
-      image_url: lookupImageUrl || null, archived: false,
+      image_url: lookupImageUrl || null, branch_id: getActiveBranchId() || null, archived: false,
       created_at: editingProduct?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     }

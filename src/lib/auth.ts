@@ -7,9 +7,12 @@ export interface User {
   name: string
   email: string
   role: 'admin' | 'cashier'
+  branch_id: string | null      // null = owner (sees all branches)
+  branch_name: string | null    // human-readable, stored for display
 }
 
 const SESSION_KEY = 'smartpos_user'
+const ACTIVE_BRANCH_KEY = 'smartpos_active_branch' // owner can switch branches
 
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -25,39 +28,47 @@ export async function login(email: string, password: string): Promise<{ success:
 
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('*')
+      .select('*, branches(name)')
       .eq('email', email.trim().toLowerCase())
       .single()
 
-    if (userError || !userData) {
-      // Also try without lowercasing in case email was stored differently
+    const rawUser = userError ? null : userData
+
+    if (!rawUser) {
       const { data: userData2 } = await supabase
         .from('users')
-        .select('*')
+        .select('*, branches(name)')
         .eq('email', email.trim())
         .single()
 
-      if (!userData2) {
-        return { success: false, error: 'No account found with this email.' }
-      }
+      if (!userData2) return { success: false, error: 'No account found with this email.' }
 
       const isValid = await hashPassword(password).then(h => h === userData2.password_hash)
       if (!isValid) return { success: false, error: 'Incorrect password.' }
 
-      const user: User = { id: userData2.id, name: userData2.name, email: userData2.email, role: userData2.role }
+      const user: User = {
+        id: userData2.id, name: userData2.name, email: userData2.email,
+        role: userData2.role,
+        branch_id: userData2.branch_id || null,
+        branch_name: (userData2 as any).branches?.name || null,
+      }
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
       return { success: true, user }
     }
 
     const passwordHash = await hashPassword(password)
-    if (passwordHash !== userData.password_hash) {
+    if (passwordHash !== rawUser.password_hash) {
       return { success: false, error: 'Incorrect password.' }
     }
 
-    const user: User = { id: userData.id, name: userData.name, email: userData.email, role: userData.role }
+    const user: User = {
+      id: rawUser.id, name: rawUser.name, email: rawUser.email,
+      role: rawUser.role,
+      branch_id: rawUser.branch_id || null,
+      branch_name: (rawUser as any).branches?.name || null,
+    }
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
 
-    // Cache in IndexedDB for offline use
     try {
       const { storeCurrentUser } = await import('./indexeddb')
       await storeCurrentUser(user)
@@ -67,8 +78,6 @@ export async function login(email: string, password: string): Promise<{ success:
 
   } catch (error: any) {
     console.error('Login error:', error)
-
-    // Offline fallback — check IndexedDB
     try {
       const { getCachedUser } = await import('./indexeddb')
       const cachedUser = await getCachedUser(email.trim())
@@ -77,13 +86,13 @@ export async function login(email: string, password: string): Promise<{ success:
         return { success: true, user: cachedUser }
       }
     } catch (_) {}
-
     return { success: false, error: 'Could not connect. Check your internet connection.' }
   }
 }
 
 export async function logout(): Promise<void> {
   sessionStorage.removeItem(SESSION_KEY)
+  sessionStorage.removeItem(ACTIVE_BRANCH_KEY)
   try {
     const { clearCurrentUser } = await import('./indexeddb')
     await clearCurrentUser()
@@ -99,12 +108,42 @@ export function getCurrentAuthUser(): User | null {
   return null
 }
 
+/** The branch currently being viewed.
+ *  - For cashiers: always their assigned branch.
+ *  - For admins/owners: the branch they've selected in the UI (or null = all branches).
+ */
+export function getActiveBranchId(): string | null {
+  if (typeof window === 'undefined') return null
+  const user = getCurrentAuthUser()
+  if (!user) return null
+  // Cashiers are locked to their branch
+  if (user.branch_id) return user.branch_id
+  // Admins can switch: read from sessionStorage
+  try {
+    return sessionStorage.getItem(ACTIVE_BRANCH_KEY) || null
+  } catch (_) { return null }
+}
+
+export function setActiveBranchId(branchId: string | null): void {
+  if (typeof window === 'undefined') return
+  if (branchId) {
+    sessionStorage.setItem(ACTIVE_BRANCH_KEY, branchId)
+  } else {
+    sessionStorage.removeItem(ACTIVE_BRANCH_KEY)
+  }
+}
+
 export function isAdmin(user: User | null): boolean {
   return user?.role === 'admin'
 }
 
 export function isCashier(user: User | null): boolean {
   return user?.role === 'cashier'
+}
+
+export function isOwner(user: User | null): boolean {
+  // Owner = admin with no branch_id (sees all branches)
+  return user?.role === 'admin' && !user?.branch_id
 }
 
 export function hasPermission(user: User | null, permission: string): boolean {
@@ -114,21 +153,26 @@ export function hasPermission(user: User | null, permission: string): boolean {
   return cashierPermissions.includes(permission)
 }
 
-// Helper for creating users (run once from admin)
-export async function register(name: string, email: string, password: string, role: 'admin' | 'cashier'): Promise<{ success: boolean; user?: User; error?: string }> {
+export async function register(
+  name: string, email: string, password: string,
+  role: 'admin' | 'cashier', branch_id?: string | null
+): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     const { supabase } = await import('./supabase')
     const passwordHash = await hashPassword(password)
 
     const { data: newUser, error } = await supabase
       .from('users')
-      .insert({ name, email: email.trim().toLowerCase(), password_hash: passwordHash, role })
+      .insert({ name, email: email.trim().toLowerCase(), password_hash: passwordHash, role, branch_id: branch_id || null })
       .select()
       .single()
 
     if (error || !newUser) return { success: false, error: error?.message || 'Failed to create user' }
 
-    const user: User = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }
+    const user: User = {
+      id: newUser.id, name: newUser.name, email: newUser.email,
+      role: newUser.role, branch_id: newUser.branch_id || null, branch_name: null
+    }
     return { success: true, user }
   } catch (error: any) {
     return { success: false, error: error.message || 'Registration failed' }

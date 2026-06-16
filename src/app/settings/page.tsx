@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, Building2, Receipt, DollarSign } from 'lucide-react'
-import { getCurrentAuthUser } from '@/lib/auth'
+import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff } from 'lucide-react'
+import { getCurrentAuthUser, isOwner, register } from '@/lib/auth'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax'>('business')
+  const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax' | 'staff'>('business')
   const [saving, setSaving] = useState(false)
   
   const [businessSettings, setBusinessSettings] = useState({
@@ -29,14 +29,62 @@ export default function SettingsPage() {
     enabled: false
   })
 
+  // Staff management state
+  const [staffList, setStaffList] = useState<any[]>([])
+  const [branches, setBranches] = useState<any[]>([])
+  const [showStaffModal, setShowStaffModal] = useState(false)
+  const [staffForm, setStaffForm] = useState({ name: '', email: '', password: '', role: 'cashier', branch_id: '' })
+  const [showPassword, setShowPassword] = useState(false)
+  const [savingStaff, setSavingStaff] = useState(false)
+
   useEffect(() => {
     loadUser()
     loadSettings()
+    loadStaff()
   }, [])
 
   const loadUser = () => {
     const currentUser = getCurrentAuthUser()
     setUser(currentUser)
+  }
+
+  const loadStaff = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const [{ data: users }, { data: branchData }] = await Promise.all([
+        supabase.from('users').select('id,name,email,role,branch_id,created_at,branches(name)').order('created_at'),
+        supabase.from('branches').select('id,name').eq('is_active', true).order('name')
+      ])
+      if (users) setStaffList(users)
+      if (branchData) setBranches(branchData)
+    } catch (_) {}
+  }
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingStaff(true)
+    const result = await register(
+      staffForm.name, staffForm.email, staffForm.password,
+      staffForm.role as 'admin' | 'cashier',
+      staffForm.branch_id || null
+    )
+    if (result.success) {
+      setShowStaffModal(false)
+      setStaffForm({ name: '', email: '', password: '', role: 'cashier', branch_id: '' })
+      loadStaff()
+    } else {
+      alert(result.error || 'Failed to add staff')
+    }
+    setSavingStaff(false)
+  }
+
+  const handleDeleteStaff = async (id: string, name: string) => {
+    if (!confirm(\`Remove \${name} from the system?\`)) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('users').delete().eq('id', id)
+      loadStaff()
+    } catch (_) {}
   }
 
   const loadSettings = async () => {
@@ -163,10 +211,12 @@ export default function SettingsPage() {
     }
   }
 
+  const owner = isOwner(user)
   const tabs = [
     { id: 'business' as const, label: 'Business', icon: Building2 },
     { id: 'receipt' as const, label: 'Receipt', icon: Receipt },
-    { id: 'tax' as const, label: 'Tax', icon: DollarSign }
+    { id: 'tax' as const, label: 'Tax', icon: DollarSign },
+    ...(owner ? [{ id: 'staff' as const, label: 'Staff', icon: Users }] : [])
   ]
 
   return (
@@ -381,18 +431,130 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="pt-6 border-t mt-6">
-            <button
-              onClick={saveSettings}
-              disabled={saving}
-              className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="h-4 w-4" />
-              <span>{saving ? 'Saving...' : 'Save Settings'}</span>
-            </button>
-          </div>
+          {/* Staff Tab */}
+          {activeTab === 'staff' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Staff Management</h2>
+                <button onClick={() => setShowStaffModal(true)}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700">
+                  <Plus className="w-4 h-4" /> Add Staff
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {staffList.map(u => (
+                  <div key={u.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                    <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-blue-700 text-sm font-bold">{u.name?.charAt(0)?.toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{u.name}</p>
+                      <p className="text-xs text-gray-500">{u.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {u.role}
+                      </span>
+                      {(u as any).branches?.name ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium">
+                          {(u as any).branches.name}
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">All Branches</span>
+                      )}
+                      <button onClick={() => handleDeleteStaff(u.id, u.name)}
+                        className="p-1.5 hover:bg-red-50 rounded-lg ml-1">
+                        <X className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {staffList.length === 0 && (
+                  <p className="text-center text-gray-400 py-8 text-sm">No staff yet. Add your first staff member.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab !== 'staff' && (
+            <div className="pt-6 border-t mt-6">
+              <button onClick={saveSettings} disabled={saving}
+                className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Add Staff Modal */}
+      {showStaffModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="font-bold text-gray-900">Add Staff Member</h2>
+              <button onClick={() => setShowStaffModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleAddStaff} className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Full Name *</label>
+                <input required type="text" value={staffForm.name} onChange={e => setStaffForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Jane Doe" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Email *</label>
+                <input required type="email" value={staffForm.email} onChange={e => setStaffForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="jane@shop.com" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Password *</label>
+                <div className="relative">
+                  <input required type={showPassword ? 'text' : 'password'} value={staffForm.password}
+                    onChange={e => setStaffForm(p => ({ ...p, password: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                    placeholder="Min 8 characters" minLength={8} />
+                  <button type="button" onClick={() => setShowPassword(o => !o)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Role *</label>
+                  <select value={staffForm.role} onChange={e => setStaffForm(p => ({ ...p, role: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="cashier">Cashier</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Branch</label>
+                  <select value={staffForm.branch_id} onChange={e => setStaffForm(p => ({ ...p, branch_id: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Branches</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setShowStaffModal(false)}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={savingStaff}
+                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                  {savingStaff ? 'Adding...' : 'Add Staff'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
