@@ -39,37 +39,56 @@ export default function BarcodeScanner({
   const playBeep = useCallback(() => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const t = ctx.currentTime
 
-      // Compressor to maximise perceived loudness without clipping
+      // WaveShaper — adds harmonic distortion so the beep cuts through at any volume
+      const makeDistortionCurve = (amount: number) => {
+        const samples = 256
+        const curve = new Float32Array(samples)
+        for (let i = 0; i < samples; i++) {
+          const x = (i * 2) / samples - 1
+          curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x))
+        }
+        return curve
+      }
+      const shaper = ctx.createWaveShaper()
+      shaper.curve = makeDistortionCurve(400)
+      shaper.oversample = '4x'
+
+      // Brickwall compressor — max loudness, zero headroom
       const compressor = ctx.createDynamicsCompressor()
-      compressor.threshold.value = -6
-      compressor.knee.value = 3
-      compressor.ratio.value = 8
-      compressor.attack.value = 0.001
-      compressor.release.value = 0.1
+      compressor.threshold.value = -3
+      compressor.knee.value = 0
+      compressor.ratio.value = 20
+      compressor.attack.value = 0.0
+      compressor.release.value = 0.05
       compressor.connect(ctx.destination)
+      shaper.connect(compressor)
 
-      // Main beep — sine wave is louder perceptually than square at same gain
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain); gain.connect(compressor)
-      osc.frequency.value = 1800
-      osc.type = 'sine'
-      gain.gain.setValueAtTime(1.0, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15)
-      osc.start(ctx.currentTime)
-      osc.stop(ctx.currentTime + 0.15)
+      // Pre-gain slams the signal hard into the shaper + compressor
+      const preGain = ctx.createGain()
+      preGain.gain.value = 6.0
+      preGain.connect(shaper)
 
-      // Second higher beep
-      const osc2 = ctx.createOscillator()
-      const gain2 = ctx.createGain()
-      osc2.connect(gain2); gain2.connect(compressor)
-      osc2.frequency.value = 2400
-      osc2.type = 'sine'
-      gain2.gain.setValueAtTime(1.0, ctx.currentTime + 0.18)
-      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.30)
-      osc2.start(ctx.currentTime + 0.18)
-      osc2.stop(ctx.currentTime + 0.30)
+      // Stack 3 detuned square oscillators per beep — fatter, louder tone
+      const beep = (freq: number, start: number, dur: number) => {
+        ;[-5, 0, 5].forEach(detune => {
+          const osc = ctx.createOscillator()
+          const g = ctx.createGain()
+          osc.connect(g)
+          g.connect(preGain)
+          osc.type = 'square'
+          osc.frequency.value = freq
+          osc.detune.value = detune
+          g.gain.setValueAtTime(1.0, t + start)
+          g.gain.exponentialRampToValueAtTime(0.001, t + start + dur)
+          osc.start(t + start)
+          osc.stop(t + start + dur + 0.01)
+        })
+      }
+
+      beep(1900, 0,    0.14)
+      beep(2600, 0.18, 0.14)
     } catch (_) {}
   }, [])
 
