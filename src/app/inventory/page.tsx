@@ -361,42 +361,18 @@ export default function InventoryPage() {
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 px-5 py-4">
+            <div className="overflow-y-auto flex-1">
               <form onSubmit={handleSubmit} className="space-y-4" id="product-form">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Product Name *</label>
-                  <input required type="text" value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. Coca Cola 500ml" />
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">SKU</label>
-                    <input type="text" value={formData.sku}
-                      onChange={e => setFormData({ ...formData, sku: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Optional" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Unit</label>
-                    <input type="text" value={formData.unit}
-                      onChange={e => setFormData({ ...formData, unit: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="pcs, kg, L" />
-                  </div>
-                </div>
-
-                {/* Barcode */}
-                <div>
+                {/* ── STEP 1: Barcode scan ── */}
+                <div className="px-5 pt-4">
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Barcode *</label>
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
                       <input required type="text" value={formData.barcode}
                         onChange={e => handleBarcodeChange(e.target.value)}
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 pr-8"
-                        placeholder="Scan or enter barcode" />
+                        placeholder="Scan or type barcode" />
                       {lookingUp && (
                         <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" />
                       )}
@@ -412,81 +388,80 @@ export default function InventoryPage() {
                       <Camera className="w-4 h-4" />
                     </button>
                   </div>
+                </div>
 
-                  {/* Lookup result — rich product card */}
-                  {lookupResult && (
-                    <div className="mt-3 border border-green-200 bg-green-50 rounded-xl overflow-hidden">
-                      <div className="flex items-stretch gap-0">
-                        {lookupResult.imageUrl && (
-                          <div className="w-20 flex-shrink-0 bg-white flex items-center justify-center p-1.5 border-r border-green-200">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={lookupResult.imageUrl}
-                              alt={lookupResult.name}
-                              className="w-full h-16 object-contain rounded"
-                              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                            />
+                {/* ── Product lookup preview (POS-style) ── */}
+                {lookingUp && (
+                  <div className="mx-5 rounded-2xl bg-gray-900 text-white p-4 flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0 animate-pulse">
+                      <Loader2 className="w-6 h-6 text-white/60 animate-spin" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-400 font-semibold uppercase tracking-wide mb-1">Looking up barcode...</p>
+                      <p className="text-sm text-white/60">Searching product databases</p>
+                    </div>
+                  </div>
+                )}
+
+                {!lookingUp && lookupResult && (
+                  <div className="mx-5 rounded-2xl bg-gray-900 text-white overflow-hidden">
+                    <div className="flex items-stretch">
+                      {/* Product image — large and prominent */}
+                      <div className="w-24 flex-shrink-0 bg-white flex items-center justify-center p-2">
+                        {lookupResult.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={lookupResult.imageUrl}
+                            alt={lookupResult.name}
+                            className="w-full h-20 object-contain"
+                            onError={e => {
+                              const el = e.target as HTMLImageElement
+                              el.style.display = 'none'
+                              el.parentElement!.innerHTML = `<div class="w-20 h-20 flex items-center justify-center"><span class="text-gray-400 text-3xl font-bold">${lookupResult!.name.charAt(0)}</span></div>`
+                            }}
+                          />
+                        ) : (
+                          <div className="w-20 h-20 flex items-center justify-center">
+                            <span className="text-gray-400 text-3xl font-bold">{lookupResult.name.charAt(0)}</span>
                           </div>
                         )}
-                        <div className="flex-1 p-3 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
-                            <span className="text-xs font-semibold text-green-700">Found via {lookupResult.source}</span>
-                          </div>
-                          <p className="text-sm font-bold text-gray-900 leading-tight truncate">{lookupResult.name}</p>
-                          {lookupResult.brand && (
-                            <p className="text-xs text-gray-500 mt-0.5">Brand: <span className="font-medium text-gray-700">{lookupResult.brand}</span></p>
-                          )}
-                          {lookupResult.category && (
-                            <p className="text-xs text-gray-500">Category: <span className="font-medium text-gray-700">{lookupResult.category}</span></p>
-                          )}
+                      </div>
+                      {/* Product details */}
+                      <div className="flex-1 p-4 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                          <span className="text-xs font-semibold text-green-400 uppercase tracking-wide">Found · {lookupResult.source}</span>
                         </div>
+                        <p className="text-base font-bold text-white leading-snug">{lookupResult.name}</p>
+                        {lookupResult.brand && (
+                          <p className="text-sm text-white/60 mt-0.5">{lookupResult.brand}</p>
+                        )}
+                        {lookupResult.category && (
+                          <span className="inline-block mt-1.5 text-xs bg-white/10 text-white/70 px-2 py-0.5 rounded-full">{lookupResult.category}</span>
+                        )}
+                        <p className="text-xs text-white/40 mt-2">Fields auto-filled ↓ just add prices &amp; stock</p>
                       </div>
                     </div>
-                  )}
-                  {!lookingUp && !lookupResult && formData.barcode.length >= 8 && !editingProduct && (
-                    <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500">
-                      <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>No online match found — fill details manually</span>
-                    </div>
-                  )}
+                  </div>
+                )}
 
+                {!lookingUp && !lookupResult && formData.barcode.length >= 8 && !editingProduct && (
+                  <div className="mx-5 flex items-center gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>No online match — fill all details manually below</span>
+                  </div>
+                )}
+
+                <div className="px-5 pb-4 space-y-4">
+                  {/* Barcode mini preview */}
                   {formData.barcode && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded-xl flex justify-center">
+                    <div className="p-2 bg-gray-50 rounded-xl flex justify-center border border-gray-100">
                       <BarcodeDisplay value={formData.barcode} width={180} height={55} />
                     </div>
                   )}
+
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Cost Price (KES) *</label>
-                    <input required type="number" step="0.01" min="0" value={formData.cost_price}
-                      onChange={e => setFormData({ ...formData, cost_price: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Selling Price (KES) *</label>
-                    <input required type="number" step="0.01" min="0" value={formData.selling_price}
-                      onChange={e => setFormData({ ...formData, selling_price: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Stock Qty *</label>
-                    <input required type="number" min="0" value={formData.stock}
-                      onChange={e => setFormData({ ...formData, stock: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Min Stock</label>
-                    <input type="number" min="0" value={formData.minimum_stock}
-                      onChange={e => setFormData({ ...formData, minimum_stock: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                </div>
               </form>
             </div>
 
