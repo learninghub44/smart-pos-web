@@ -3,192 +3,242 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { getCurrentAuthUser, logout, isAdmin } from '@/lib/auth'
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  Receipt, 
-  LogOut, 
-  Menu,
-  X,
-  Store,
-  Settings,
-  Users,
-  Truck,
-  FileText,
-  TrendingUp,
-  ChevronRight
+import { getCurrentAuthUser, logout } from '@/lib/auth'
+import {
+  LayoutDashboard, ShoppingCart, Package, Receipt,
+  LogOut, Menu, X, Store, Settings, Users, Truck,
+  FileText, TrendingUp, GitBranch
 } from 'lucide-react'
 
+const NAV = [
+  { name: 'Dashboard',    href: '/dashboard',     icon: LayoutDashboard, admin: false },
+  { name: 'POS',          href: '/pos',            icon: ShoppingCart,    admin: false },
+  { name: 'Inventory',    href: '/inventory',      icon: Package,         admin: true  },
+  { name: 'Customers',    href: '/customers',      icon: Users,           admin: true  },
+  { name: 'Suppliers',    href: '/suppliers',      icon: Truck,           admin: true  },
+  { name: 'Sales History',href: '/sales-history',  icon: FileText,        admin: false },
+  { name: 'Receipts',     href: '/receipts',       icon: Receipt,         admin: false },
+  { name: 'Reports',      href: '/reports',        icon: TrendingUp,      admin: true  },
+  { name: 'Branches',     href: '/branches',       icon: GitBranch,       admin: true  },
+  { name: 'Settings',     href: '/settings',       icon: Settings,        admin: true  },
+]
+
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser]           = useState<any>(null)
+  const [open, setOpen]           = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
+  const router   = useRouter()
 
-  useEffect(() => {
-    checkAuth()
-  }, [pathname])
-
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    setSidebarOpen(false)
-  }, [pathname])
+  useEffect(() => { checkAuth() }, [pathname])
+  useEffect(() => { setOpen(false) }, [pathname])
 
   const checkAuth = async () => {
-    const currentUser = await getCurrentAuthUser()
-    if (!currentUser && pathname !== '/login') {
-      router.push('/login')
-    } else {
-      setUser(currentUser)
-    }
+    const u = await getCurrentAuthUser()
+    if (!u && pathname !== '/login') router.push('/login')
+    else setUser(u)
   }
 
-  const handleLogout = async () => {
-    await logout()
-    router.push('/login')
-  }
+  const handleLogout = async () => { await logout(); router.push('/login') }
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, adminOnly: false },
-    { name: 'POS', href: '/pos', icon: ShoppingCart, adminOnly: false },
-    { name: 'Inventory', href: '/inventory', icon: Package, adminOnly: true },
-    { name: 'Customers', href: '/customers', icon: Users, adminOnly: true },
-    { name: 'Suppliers', href: '/suppliers', icon: Truck, adminOnly: true },
-    { name: 'Sales History', href: '/sales-history', icon: FileText, adminOnly: false },
-    { name: 'Receipts', href: '/receipts', icon: Receipt, adminOnly: false },
-    { name: 'Reports', href: '/reports', icon: TrendingUp, adminOnly: true },
-    { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
-  ]
+  const nav = NAV.filter(n => !n.admin || user?.role === 'admin')
 
-  const visibleNav = navigation.filter(item => !item.adminOnly || user?.role === 'admin')
-
-  if (pathname === '/login') {
-    return <>{children}</>
-  }
+  if (pathname === '/login') return <>{children}</>
 
   return (
-    <div className="min-h-screen bg-gray-100 flex overflow-hidden">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--bg)' }}>
+
+      {/* ── Overlay ── */}
+      {open && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setOpen(false)}
+          style={{
+            position:'fixed', inset:0, background:'rgba(0,0,0,.45)',
+            zIndex:40, display:'none'
+          }}
+          className="lg-overlay"
         />
       )}
 
-      {/* Sidebar */}
+      {/* ── Sidebar ── */}
       <aside
-        className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl flex flex-col
-          transform transition-transform duration-300 ease-in-out
-          lg:relative lg:translate-x-0 lg:shadow-none lg:border-r lg:border-gray-200
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
+        style={{
+          width: 220,
+          background: 'var(--sidebar-bg)',
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0,
+          height: '100vh',
+          overflowY: 'auto',
+          position: 'relative',
+          zIndex: 50,
+          transition: 'transform .25s ease',
+        }}
+        className="sidebar"
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Store className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-base font-bold text-gray-900 tracking-tight">SMART POS</span>
+        <div style={{
+          display:'flex', alignItems:'center', gap:10,
+          padding:'20px 16px 16px',
+          borderBottom:'1px solid rgba(255,255,255,.07)'
+        }}>
+          <div style={{
+            width:32, height:32, borderRadius:8,
+            background:'var(--blue)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            flexShrink:0
+          }}>
+            <Store size={16} color="#fff" />
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div>
+            <p style={{ color:'#fff', fontWeight:700, fontSize:13, lineHeight:1.2 }}>Smart POS</p>
+            <p style={{ color:'var(--txt-3)', fontSize:11 }}>v2.0</p>
+          </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3">
-          <div className="space-y-0.5">
-            {visibleNav.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                    ${isActive
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }
-                  `}
-                >
-                  <Icon className={`h-4.5 w-4.5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <span>{item.name}</span>
-                  {isActive && <ChevronRight className="h-3.5 w-3.5 ml-auto text-blue-400" />}
-                </Link>
-              )
-            })}
-          </div>
+        <nav style={{ padding:'12px 8px', flex:1 }}>
+          <p style={{
+            fontSize:10, fontWeight:700, color:'#4B5563',
+            letterSpacing:'.08em', textTransform:'uppercase',
+            padding:'4px 8px 8px'
+          }}>Menu</p>
+
+          {nav.map(item => {
+            const Icon = item.icon
+            const active = pathname === item.href
+            return (
+              <Link key={item.name} href={item.href} style={{
+                display:'flex', alignItems:'center', gap:10,
+                padding:'9px 10px', borderRadius:8, marginBottom:2,
+                textDecoration:'none', transition:'background .12s',
+                background: active ? 'var(--sidebar-actbg)' : 'transparent',
+                color: active ? 'var(--sidebar-act)' : 'var(--sidebar-txt)',
+                fontWeight: active ? 600 : 400, fontSize:13
+              }}>
+                <Icon size={15} style={{ flexShrink:0, opacity: active ? 1 : .7 }} />
+                {item.name}
+                {active && (
+                  <span style={{
+                    marginLeft:'auto', width:4, height:4,
+                    borderRadius:'50%', background:'var(--blue)'
+                  }} />
+                )}
+              </Link>
+            )
+          })}
         </nav>
 
-        {/* User + Logout */}
-        <div className="border-t border-gray-100 p-4 flex-shrink-0">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-700 text-sm font-semibold">
+        {/* User */}
+        <div style={{
+          padding:'12px 8px', borderTop:'1px solid rgba(255,255,255,.07)'
+        }}>
+          <div style={{
+            display:'flex', alignItems:'center', gap:10,
+            padding:'8px 10px', marginBottom:4
+          }}>
+            <div style={{
+              width:30, height:30, borderRadius:'50%',
+              background:'#374151',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              flexShrink:0
+            }}>
+              <span style={{ color:'#D1D5DB', fontSize:12, fontWeight:700 }}>
                 {user?.name?.charAt(0)?.toUpperCase()}
               </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
-              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+            <div style={{ minWidth:0 }}>
+              <p style={{ color:'#E5E7EB', fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {user?.name}
+              </p>
+              <p style={{ color:'#6B7280', fontSize:11, textTransform:'capitalize' }}>{user?.role}</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+
+          <button onClick={handleLogout} style={{
+            display:'flex', alignItems:'center', gap:8,
+            width:'100%', padding:'8px 10px', borderRadius:8,
+            background:'transparent', border:'none', cursor:'pointer',
+            color:'#EF4444', fontSize:12, fontWeight:500, transition:'background .12s'
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background='rgba(239,68,68,.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background='transparent')}
           >
-            <LogOut className="h-4 w-4" />
-            <span>Sign out</span>
+            <LogOut size={14} />
+            Sign out
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center px-4 flex-shrink-0 gap-4">
+      {/* ── Main ── */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
+        {/* Topbar */}
+        <header style={{
+          height:56, background:'var(--surface)',
+          borderBottom:'1px solid var(--border)',
+          display:'flex', alignItems:'center',
+          padding:'0 20px', gap:12, flexShrink:0,
+          boxShadow:'0 1px 0 var(--border)'
+        }}>
+          {/* Mobile menu button */}
           <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            onClick={() => setOpen(o => !o)}
+            className="mobile-menu-btn"
+            style={{
+              display:'none', padding:6, borderRadius:6,
+              background:'none', border:'none', cursor:'pointer',
+              color:'var(--txt-2)'
+            }}
           >
-            <Menu className="h-5 w-5" />
+            <Menu size={20} />
           </button>
 
-          {/* Page breadcrumb on mobile */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate lg:hidden">
-              {visibleNav.find(n => n.href === pathname)?.name || 'SMART POS'}
+          {/* Page name */}
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ fontSize:15, fontWeight:700, color:'var(--txt-1)', lineHeight:1 }}>
+              {nav.find(n => n.href === pathname)?.name || 'Smart POS'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+          {/* Right */}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{
+              padding:'4px 12px', borderRadius:99,
+              background:'var(--blue-lt)', color:'var(--blue)',
+              fontSize:11, fontWeight:700
+            }}>
+              {new Date().toLocaleDateString('en-KE', { day:'numeric', month:'short' })}
             </div>
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-700 text-sm font-semibold">
+            <div style={{
+              width:32, height:32, borderRadius:'50%',
+              background:'var(--blue-lt)',
+              display:'flex', alignItems:'center', justifyContent:'center'
+            }}>
+              <span style={{ color:'var(--blue)', fontSize:12, fontWeight:700 }}>
                 {user?.name?.charAt(0)?.toUpperCase()}
               </span>
             </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto p-4 md:p-6">
+        {/* Content */}
+        <main style={{ flex:1, overflowY:'auto', padding:'24px' }}>
           {children}
         </main>
       </div>
+
+      {/* Mobile styles */}
+      <style>{`
+        @media (max-width: 1023px) {
+          .sidebar {
+            position: fixed !important;
+            top: 0; left: 0; bottom: 0;
+            transform: ${open ? 'translateX(0)' : 'translateX(-100%)'} !important;
+          }
+          .lg-overlay { display: block !important; }
+          .mobile-menu-btn { display: flex !important; }
+          main { padding: 16px !important; }
+        }
+      `}</style>
     </div>
   )
 }

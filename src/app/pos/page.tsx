@@ -1,351 +1,356 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { 
-  Search, Plus, Minus, Trash2, ShoppingCart, Camera, X, 
-  Percent, DollarSign, AlertCircle, Printer, ScanLine, CheckCircle2
+import {
+  Search, Plus, Minus, Trash2, ShoppingCart, Camera,
+  X, Percent, DollarSign, AlertCircle, Printer, ScanLine, CheckCircle2, Package
 } from 'lucide-react'
-import { getAllProducts, getProductByBarcode } from '@/lib/indexeddb'
+import { getAllProducts, getProductByBarcode, syncProductsFromSupabase } from '@/lib/indexeddb'
 import { getCurrentAuthUser } from '@/lib/auth'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import Receipt from '@/components/Receipt'
 
 interface CartItem {
-  id: string
-  name: string
-  barcode: string
-  price: number
-  quantity: number
-  stock: number
-  discountAmount: number
+  id: string; name: string; barcode: string
+  price: number; quantity: number; stock: number
 }
-
-type PaymentMethod = 'cash' | 'mpesa' | 'card' | 'bank_transfer' | 'credit_account' | 'mixed'
+type PayMethod = 'cash' | 'mpesa' | 'card' | 'bank_transfer' | 'credit_account' | 'mixed'
 
 export default function POSPage() {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [products, setProducts] = useState<any[]>([])
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [showCameraScanner, setShowCameraScanner] = useState(false)
-  const [showUSBScanner, setShowUSBScanner] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [showCheckout, setShowCheckout] = useState(false)
-  const [showCartMobile, setShowCartMobile] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
-  const [cashGiven, setCashGiven] = useState('')
-  const [mpesaAmount, setMpesaAmount] = useState('')
-  const [cardAmount, setCardAmount] = useState('')
-  const [bankAmount, setBankAmount] = useState('')
-  const [creditAmount, setCreditAmount] = useState('')
-  const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | null>(null)
-  const [discountValue, setDiscountValue] = useState('')
-  const [saleNotes, setSaleNotes] = useState('')
-  const [scanError, setScanError] = useState<string | null>(null)
-  const [showReceipt, setShowReceipt] = useState(false)
-  const [completedSale, setCompletedSale] = useState<any>(null)
-  const [businessSettings, setBusinessSettings] = useState<any>(null)
-  const [processing, setProcessing] = useState(false)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [products, setProducts]       = useState<any[]>([])
+  const [search, setSearch]           = useState('')
+  const [cart, setCart]               = useState<CartItem[]>([])
+  const [user, setUser]               = useState<any>(null)
+  const [bizSettings, setBizSettings] = useState<any>(null)
+  const [scanError, setScanError]     = useState<string|null>(null)
+  const [showCamera, setShowCamera]   = useState(false)
+  const [showUSB, setShowUSB]         = useState(false)
+  const [showMobileCart, setShowMobileCart] = useState(false)
+  const [showCheckout, setShowCheckout]     = useState(false)
+  const [showReceipt, setShowReceipt]       = useState(false)
+  const [completedSale, setCompletedSale]   = useState<any>(null)
+  const [processing, setProcessing]   = useState(false)
+  // Payment
+  const [payMethod, setPayMethod]  = useState<PayMethod>('cash')
+  const [cashGiven, setCashGiven]  = useState('')
+  const [mpesaAmt, setMpesaAmt]   = useState('')
+  const [cardAmt, setCardAmt]      = useState('')
+  const [bankAmt, setBankAmt]      = useState('')
+  const [creditAmt, setCreditAmt]  = useState('')
+  const [discType, setDiscType]    = useState<'pct'|'fixed'|null>(null)
+  const [discVal, setDiscVal]      = useState('')
+  const [notes, setNotes]          = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    getCurrentAuthUser().then(u => setUser(u))
     loadProducts()
-    loadUser()
-    loadBusinessSettings()
-    // Focus search on mount
-    setTimeout(() => searchRef.current?.focus(), 300)
+    loadBiz()
+    setTimeout(() => searchRef.current?.focus(), 400)
   }, [])
 
-  useBarcodeScanner({
-    onScan: handleBarcodeScan,
-    enabled: !showCameraScanner && !showCheckout && !showUSBScanner
-  })
+  useBarcodeScanner({ onScan: handleBarcode, enabled: !showCamera && !showCheckout && !showUSB })
 
-  async function handleBarcodeScan(barcode: string) {
-    const product = await getProductByBarcode(barcode)
-    if (product) {
-      addToCart(product)
-      setSearchTerm('')
-      setScanError(null)
-    } else {
-      setScanError(`No product found for barcode: ${barcode}`)
-      setSearchTerm(barcode)
-    }
-  }
-
-  const loadBusinessSettings = async () => {
-    try {
-      const { getSettingByKey } = await import('@/lib/indexeddb')
-      const business = await getSettingByKey('business')
-      if (business) setBusinessSettings(business.value)
-    } catch {}
-  }
-
-  const loadUser = async () => {
-    const currentUser = await getCurrentAuthUser()
-    setUser(currentUser)
-  }
-
-  const loadProducts = async () => {
+  async function loadProducts() {
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('archived', false)
-        .gt('stock', 0)
-        .order('name')
-      if (data && !error) {
-        setProducts(data)
-        const { syncProductsFromSupabase } = await import('@/lib/indexeddb')
-        await syncProductsFromSupabase(data)
-        return
-      }
+      const { data, error } = await supabase.from('products').select('*').eq('archived', false).gt('stock', 0).order('name')
+      if (data && !error) { setProducts(data); await syncProductsFromSupabase(data); return }
     } catch {}
     const all = await getAllProducts()
     setProducts(all.filter((p: any) => !p.archived && p.stock > 0))
   }
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.barcode.includes(searchTerm)
-  )
+  async function loadBiz() {
+    try {
+      const { getSettingByKey } = await import('@/lib/indexeddb')
+      const s = await getSettingByKey('business')
+      if (s) setBizSettings(s.value)
+    } catch {}
+  }
 
-  const addToCart = (product: any) => {
+  async function handleBarcode(barcode: string) {
+    const p = await getProductByBarcode(barcode)
+    if (p) { addToCart(p); setScanError(null) }
+    else { setScanError(`No product found: ${barcode}`); setSearch(barcode) }
+  }
+
+  const addToCart = (p: any) => {
     setCart(prev => {
-      const existing = prev.find(i => i.id === product.id)
-      if (existing) {
-        if (existing.quantity >= product.stock) return prev
-        return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
+      const ex = prev.find(i => i.id === p.id)
+      if (ex) {
+        if (ex.quantity >= p.stock) return prev
+        return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i)
       }
-      return [...prev, {
-        id: product.id, name: product.name, barcode: product.barcode,
-        price: product.selling_price, quantity: 1, stock: product.stock, discountAmount: 0
-      }]
+      return [...prev, { id:p.id, name:p.name, barcode:p.barcode, price:p.selling_price, quantity:1, stock:p.stock }]
     })
   }
 
-  const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.id !== id))
+  const setQty = (id: string, qty: number) =>
+    setCart(prev => prev.map(i => i.id !== id ? i : qty < 1 || qty > i.stock ? i : { ...i, quantity: qty }))
 
-  const updateQuantity = (id: string, qty: number) => {
-    setCart(prev => prev.map(i => {
-      if (i.id !== id) return i
-      if (qty < 1 || qty > i.stock) return i
-      return { ...i, quantity: qty }
-    }))
+  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0)
+  const discount = discType && discVal
+    ? discType === 'pct' ? subtotal * (parseFloat(discVal) / 100) : parseFloat(discVal)
+    : 0
+  const total    = Math.max(0, subtotal - discount)
+  const totalQty = cart.reduce((s, i) => s + i.quantity, 0)
+  const cashNum  = parseFloat(cashGiven) || 0
+  const change   = payMethod === 'cash' && cashNum > total ? cashNum - total : 0
+  const mixedPaid = (parseFloat(mpesaAmt)||0) + (parseFloat(cardAmt)||0) + (parseFloat(bankAmt)||0) + (parseFloat(creditAmt)||0) + cashNum
+  const mixedBal  = payMethod === 'mixed' ? total - mixedPaid : 0
+
+  const filtered = products.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)
+  )
+
+  const clearCheckout = () => {
+    setCart([]); setPayMethod('cash'); setCashGiven(''); setMpesaAmt(''); setCardAmt('')
+    setBankAmt(''); setCreditAmt(''); setDiscType(null); setDiscVal(''); setNotes('')
+    setShowMobileCart(false)
   }
 
-  const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0)
-  const cartDiscount = discountType && discountValue
-    ? discountType === 'percentage'
-      ? cartSubtotal * (parseFloat(discountValue) / 100)
-      : parseFloat(discountValue)
-    : 0
-  const cartTotal = Math.max(0, cartSubtotal - cartDiscount)
-  const cartItemsCount = cart.reduce((s, i) => s + i.quantity, 0)
-
-  // For cash: change calculation
-  const cashGivenNum = parseFloat(cashGiven) || 0
-  const change = paymentMethod === 'cash' && cashGivenNum > cartTotal
-    ? cashGivenNum - cartTotal
-    : 0
-
-  // Mixed total paid
-  const mixedPaid = (parseFloat(mpesaAmount) || 0) + (parseFloat(cardAmount) || 0) +
-    (parseFloat(bankAmount) || 0) + (parseFloat(creditAmount) || 0) + cashGivenNum
-  const mixedBalance = paymentMethod === 'mixed' ? cartTotal - mixedPaid : 0
-
   const completeSale = async () => {
-    if (processing) return
-    if (cart.length === 0) return
-
-    // Validate payment
-    if (paymentMethod === 'cash' && cashGivenNum < cartTotal) {
-      alert(`Cash given (KES ${cashGivenNum.toLocaleString()}) is less than total (KES ${cartTotal.toLocaleString()})`)
-      return
-    }
-    if (paymentMethod === 'mixed' && mixedBalance > 0.01) {
-      alert(`Payment incomplete. Remaining: KES ${mixedBalance.toLocaleString()}`)
-      return
-    }
+    if (processing || cart.length === 0) return
+    if (payMethod === 'cash' && cashNum < total) return alert(`Cash given (KES ${cashNum.toLocaleString()}) is less than total (KES ${total.toLocaleString()})`)
+    if (payMethod === 'mixed' && mixedBal > 0.01) return alert(`Remaining: KES ${mixedBal.toLocaleString()}`)
 
     setProcessing(true)
+    const now = new Date().toISOString()
+    const date = now.slice(0,10).replace(/-/g,'')
+    const pin  = `POS-${Math.random().toString(36).substr(2,9).toUpperCase()}`
+    const rcpt = `RCP-${date}-${Math.random().toString(36).substr(2,6).toUpperCase()}`
 
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const receiptNumber = `RCP-${dateStr}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-    const receiptPin = `POS-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
-
-    let cashAmt = 0, mpesaAmt = 0, cardAmt = 0, bankAmt = 0, creditAmt = 0
-    if (paymentMethod === 'cash') cashAmt = cartTotal
-    else if (paymentMethod === 'mpesa') mpesaAmt = cartTotal
-    else if (paymentMethod === 'card') cardAmt = cartTotal
-    else if (paymentMethod === 'bank_transfer') bankAmt = cartTotal
-    else if (paymentMethod === 'credit_account') creditAmt = cartTotal
-    else {
-      cashAmt = parseFloat(cashGiven) || 0
-      mpesaAmt = parseFloat(mpesaAmount) || 0
-      cardAmt = parseFloat(cardAmount) || 0
-      bankAmt = parseFloat(bankAmount) || 0
-      creditAmt = parseFloat(creditAmount) || 0
-    }
+    let cashA=0, mpesaA=0, cardA=0, bankA=0, creditA=0
+    if (payMethod==='cash') cashA=total
+    else if (payMethod==='mpesa') mpesaA=total
+    else if (payMethod==='card') cardA=total
+    else if (payMethod==='bank_transfer') bankA=total
+    else if (payMethod==='credit_account') creditA=total
+    else { cashA=parseFloat(cashGiven)||0; mpesaA=parseFloat(mpesaAmt)||0; cardA=parseFloat(cardAmt)||0; bankA=parseFloat(bankAmt)||0; creditA=parseFloat(creditAmt)||0 }
 
     const sale = {
-      id: crypto.randomUUID(),
-      total_amount: cartTotal,
-      discount_amount: cartDiscount,
-      discount_type: discountType,
-      payment_method: paymentMethod,
-      cash_amount: cashAmt || null,
-      mpesa_amount: mpesaAmt || null,
-      card_amount: cardAmt || null,
-      bank_amount: bankAmt || null,
-      credit_amount: creditAmt || null,
-      receipt_pin: receiptPin,
-      receipt_number: receiptNumber,
-      cashier_id: user?.id,
-      notes: saleNotes || null,
-      created_at: new Date().toISOString(),
-      synced: true
+      id: crypto.randomUUID(), total_amount: total, discount_amount: discount,
+      discount_type: discType, payment_method: payMethod,
+      cash_amount: cashA||null, mpesa_amount: mpesaA||null, card_amount: cardA||null,
+      bank_amount: bankA||null, credit_amount: creditA||null,
+      receipt_pin: pin, receipt_number: rcpt,
+      cashier_id: user?.id, notes: notes||null, created_at: now, synced: true
     }
-
     const saleItems = cart.map(item => ({
-      id: crypto.randomUUID(),
-      sale_id: sale.id,
-      product_id: item.id,
-      product_name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-      discount_amount: item.discountAmount,
-      created_at: new Date().toISOString()
+      id: crypto.randomUUID(), sale_id: sale.id, product_id: item.id,
+      product_name: item.name, quantity: item.quantity, price: item.price,
+      discount_amount: 0, created_at: now
     }))
 
     try {
       const { supabase } = await import('@/lib/supabase')
       await supabase.from('sales').insert(sale)
       await supabase.from('sale_items').insert(saleItems)
-      for (const item of cart) {
-        await supabase.from('products')
-          .update({ stock: item.stock - item.quantity, updated_at: new Date().toISOString() })
-          .eq('id', item.id)
-      }
+      for (const item of cart)
+        await supabase.from('products').update({ stock: item.stock - item.quantity, updated_at: now }).eq('id', item.id)
     } catch {
-      try {
-        const { addSaleToDB, addSaleItemToDB } = await import('@/lib/indexeddb')
-        await addSaleToDB({ ...sale, synced: false })
-        for (const item of saleItems) await addSaleItemToDB(item)
-      } catch (e) {
-        console.error('Failed to save sale:', e)
-      }
+      const idb = await import('@/lib/indexeddb')
+      await idb.addSaleToDB({ ...sale, synced: false })
+      for (const item of saleItems) await idb.addSaleItemToDB(item)
     }
 
     setCompletedSale({ ...sale, items: saleItems, change })
     setShowCheckout(false)
     setShowReceipt(true)
-    setCart([])
-    setPaymentMethod('cash')
-    setCashGiven('')
-    setMpesaAmount('')
-    setCardAmount('')
-    setBankAmount('')
-    setCreditAmount('')
-    setDiscountType(null)
-    setDiscountValue('')
-    setSaleNotes('')
+    clearCheckout()
     setProcessing(false)
-    setShowCartMobile(false)
     loadProducts()
   }
 
-  const paymentMethods: { key: PaymentMethod; label: string }[] = [
-    { key: 'cash', label: 'Cash' },
-    { key: 'mpesa', label: 'M-Pesa' },
-    { key: 'card', label: 'Card' },
-    { key: 'bank_transfer', label: 'Bank' },
-    { key: 'credit_account', label: 'Credit' },
-    { key: 'mixed', label: 'Mixed' },
+  const PAY_METHODS: { key: PayMethod; label: string }[] = [
+    { key:'cash', label:'Cash' }, { key:'mpesa', label:'M-Pesa' },
+    { key:'card', label:'Card' }, { key:'bank_transfer', label:'Bank' },
+    { key:'credit_account', label:'Credit' }, { key:'mixed', label:'Mixed' }
   ]
 
+  // ── Cart panel (shared desktop + mobile drawer) ──
+  const CartPanel = () => (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      {/* Header */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'14px 16px', borderBottom:'1px solid var(--border)', flexShrink:0
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <ShoppingCart size={15} color="var(--blue)" />
+          <span style={{ fontSize:13, fontWeight:700, color:'var(--txt-1)' }}>Cart</span>
+          {totalQty > 0 && (
+            <span style={{
+              background:'var(--blue)', color:'#fff',
+              fontSize:10, fontWeight:800, padding:'1px 7px', borderRadius:99
+            }}>{totalQty}</span>
+          )}
+        </div>
+        {cart.length > 0 && (
+          <button onClick={() => setCart([])} style={{
+            fontSize:11, color:'var(--txt-3)', background:'none', border:'none', cursor:'pointer'
+          }}>Clear</button>
+        )}
+      </div>
+
+      {/* Items */}
+      <div style={{ flex:1, overflowY:'auto', padding:'8px' }}>
+        {cart.length === 0 ? (
+          <div className="empty" style={{ padding:'32px 16px' }}>
+            <ShoppingCart size={28} />
+            <p>Cart is empty</p>
+            <span>Tap a product to add</span>
+          </div>
+        ) : cart.map(item => (
+          <div key={item.id} style={{
+            background:'var(--bg)', borderRadius:'var(--radius-sm)',
+            padding:'10px 12px', marginBottom:6
+          }}>
+            <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:6 }}>
+              <p style={{ fontSize:12, fontWeight:600, color:'var(--txt-1)', flex:1, lineHeight:1.3 }}>{item.name}</p>
+              <button onClick={() => setCart(prev => prev.filter(i => i.id !== item.id))}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:2, color:'var(--txt-3)', flexShrink:0 }}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <button onClick={() => setQty(item.id, item.quantity - 1)} disabled={item.quantity <= 1}
+                  style={{
+                    width:24, height:24, borderRadius:6, background:'var(--surface)',
+                    border:'1px solid var(--border)', cursor:'pointer', display:'flex',
+                    alignItems:'center', justifyContent:'center', color:'var(--txt-2)'
+                  }}>
+                  <Minus size={11} />
+                </button>
+                <span style={{ fontSize:13, fontWeight:700, minWidth:20, textAlign:'center', color:'var(--txt-1)' }}>{item.quantity}</span>
+                <button onClick={() => setQty(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock}
+                  style={{
+                    width:24, height:24, borderRadius:6, background:'var(--surface)',
+                    border:'1px solid var(--border)', cursor:'pointer', display:'flex',
+                    alignItems:'center', justifyContent:'center', color:'var(--txt-2)'
+                  }}>
+                  <Plus size={11} />
+                </button>
+              </div>
+              <div style={{ textAlign:'right' }}>
+                <p style={{ fontSize:13, fontWeight:800, color:'var(--txt-1)' }}>
+                  KES {(item.price * item.quantity).toLocaleString()}
+                </p>
+                <p style={{ fontSize:10, color:'var(--txt-3)' }}>@ KES {item.price.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding:'14px 16px', borderTop:'1px solid var(--border)', flexShrink:0, background:'var(--surface)' }}>
+        {discount > 0 && (
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+            <span style={{ fontSize:12, color:'var(--green)' }}>Discount</span>
+            <span style={{ fontSize:12, fontWeight:600, color:'var(--green)' }}>-KES {discount.toLocaleString()}</span>
+          </div>
+        )}
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
+          <span style={{ fontSize:14, fontWeight:700, color:'var(--txt-1)' }}>Total</span>
+          <span style={{ fontSize:16, fontWeight:800, color:'var(--blue)' }}>KES {total.toLocaleString()}</span>
+        </div>
+        <button onClick={() => { setShowMobileCart(false); setShowCheckout(true) }}
+          disabled={cart.length === 0}
+          className="btn btn-primary" style={{ width:'100%', padding:'11px', fontSize:14 }}>
+          Checkout
+        </button>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="flex flex-col h-[calc(100vh-64px-32px)] md:h-[calc(100vh-64px-48px)]">
-      {/* Page header - compact */}
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-bold text-gray-900">Point of Sale</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowUSBScanner(true)}
-            className="flex items-center gap-1.5 bg-gray-700 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 text-sm"
-          >
-            <ScanLine className="h-4 w-4" />
-            <span className="hidden sm:inline">USB Scan</span>
+    <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 56px - 48px)' }}>
+
+      {/* Page header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, gap:10 }}>
+        <h1 style={{ fontSize:18, fontWeight:700, color:'var(--txt-1)' }}>Point of Sale</h1>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => setShowUSB(true)} className="btn btn-ghost" style={{ padding:'7px 12px' }}>
+            <ScanLine size={14} /> <span className="hide-sm">USB Scan</span>
           </button>
-          <button
-            onClick={() => setShowCameraScanner(true)}
-            className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-sm"
-          >
-            <Camera className="h-4 w-4" />
-            <span className="hidden sm:inline">Camera</span>
+          <button onClick={() => setShowCamera(true)} className="btn btn-primary" style={{ padding:'7px 12px' }}>
+            <Camera size={14} /> <span className="hide-sm">Camera</span>
           </button>
         </div>
       </div>
 
-      {/* Scan error */}
       {scanError && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 text-sm text-red-700">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span className="flex-1">{scanError}</span>
-          <button onClick={() => setScanError(null)}><X className="h-4 w-4" /></button>
+        <div style={{
+          display:'flex', alignItems:'center', gap:8,
+          background:'var(--red-lt)', border:'1px solid #FECACA',
+          borderRadius:'var(--radius-sm)', padding:'8px 12px', marginBottom:10,
+          fontSize:12, color:'var(--red)'
+        }}>
+          <AlertCircle size={14} style={{ flexShrink:0 }} />
+          <span style={{ flex:1 }}>{scanError}</span>
+          <button onClick={() => setScanError(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--red)' }}><X size={14} /></button>
         </div>
       )}
 
-      {/* Main layout: products + cart side by side on lg+ */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      {/* Main split */}
+      <div style={{ flex:1, display:'flex', gap:16, minHeight:0 }}>
 
-        {/* Products panel */}
-        <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm overflow-hidden min-w-0">
+        {/* Products */}
+        <div className="card" style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Search */}
-          <div className="p-3 border-b border-gray-100">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <div style={{ padding:'12px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+            <div style={{ position:'relative' }}>
+              <Search size={14} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--txt-3)' }} />
               <input
                 ref={searchRef}
-                type="text"
-                placeholder="Search product or scan barcode..."
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setScanError(null) }}
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="input"
+                style={{ paddingLeft:32 }}
+                placeholder="Search product or scan barcode…"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setScanError(null) }}
               />
             </div>
           </div>
 
-          {/* Product grid */}
-          <div className="flex-1 overflow-y-auto p-3">
-            {filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-                <Package className="h-10 w-10 mb-2 opacity-40" />
-                <p className="text-sm">{searchTerm ? 'No products match your search' : 'No products in stock'}</p>
+          {/* Grid */}
+          <div style={{ flex:1, overflowY:'auto', padding:12 }}>
+            {filtered.length === 0 ? (
+              <div className="empty">
+                <Package size={32} />
+                <p>{search ? 'No products match' : 'No products in stock'}</p>
+                <span>{search ? 'Try a different search' : 'Add products in Inventory'}</span>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="text-left bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded-xl p-3 transition-all active:scale-95 group"
+              <div className="product-grid">
+                {filtered.map(p => (
+                  <button key={p.id} onClick={() => addToCart(p)} style={{
+                    background:'var(--bg)', border:'1.5px solid var(--border)',
+                    borderRadius:'var(--radius)', padding:'12px 10px',
+                    cursor:'pointer', textAlign:'left', transition:'all .12s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor='var(--blue)'; e.currentTarget.style.background='var(--blue-lt)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.background='var(--bg)' }}
                   >
-                    <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-200 transition-colors">
-                      <Package className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <p className="font-semibold text-gray-900 text-sm leading-tight mb-0.5 line-clamp-2">{product.name}</p>
-                    <p className="text-xs text-gray-500 mb-1.5">{product.barcode}</p>
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-blue-600 text-sm">KES {Number(product.selling_price).toLocaleString()}</p>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                        product.stock < 5 ? 'bg-red-100 text-red-600' : 
-                        product.stock < 10 ? 'bg-yellow-100 text-yellow-700' : 
-                        'bg-green-100 text-green-700'
-                      }`}>
-                        {product.stock}
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} style={{ width:'100%', height:64, objectFit:'contain', marginBottom:8, borderRadius:6 }} />
+                    ) : (
+                      <div style={{
+                        width:'100%', height:48, background:'var(--surface)',
+                        borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center',
+                        marginBottom:8
+                      }}>
+                        <Package size={20} color="var(--txt-3)" />
+                      </div>
+                    )}
+                    <p style={{ fontSize:12, fontWeight:600, color:'var(--txt-1)', lineHeight:1.3, marginBottom:4 }} className="line-clamp-2">{p.name}</p>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <p style={{ fontSize:13, fontWeight:800, color:'var(--blue)' }}>KES {Number(p.selling_price).toLocaleString()}</p>
+                      <span className={`badge ${p.stock < 5 ? 'badge-red' : p.stock < 10 ? 'badge-yellow' : 'badge-green'}`}>
+                        {p.stock}
                       </span>
                     </div>
                   </button>
@@ -355,231 +360,195 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Cart — hidden on mobile, shown via bottom bar */}
-        <div className="hidden lg:flex w-80 xl:w-96 bg-white rounded-xl shadow-sm flex-col overflow-hidden flex-shrink-0">
-          <CartPanel
-            cart={cart}
-            cartItemsCount={cartItemsCount}
-            cartSubtotal={cartSubtotal}
-            cartDiscount={cartDiscount}
-            cartTotal={cartTotal}
-            updateQuantity={updateQuantity}
-            removeFromCart={removeFromCart}
-            onCheckout={() => setShowCheckout(true)}
-          />
+        {/* Desktop cart */}
+        <div className="card desktop-cart" style={{ width:300, display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
+          <CartPanel />
         </div>
       </div>
 
       {/* Mobile cart FAB */}
-      <div className="lg:hidden fixed bottom-4 right-4 z-30">
-        <button
-          onClick={() => setShowCartMobile(true)}
-          className="relative bg-blue-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all"
-        >
-          <ShoppingCart className="h-6 w-6" />
-          {cartItemsCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-              {cartItemsCount > 9 ? '9+' : cartItemsCount}
-            </span>
-          )}
-        </button>
-      </div>
+      <button onClick={() => setShowMobileCart(true)} className="mobile-cart-fab" style={{
+        position:'fixed', bottom:20, right:20, zIndex:30,
+        width:56, height:56, borderRadius:'50%',
+        background:'var(--blue)', color:'#fff', border:'none',
+        cursor:'pointer', boxShadow:'var(--shadow-lg)',
+        display:'none', alignItems:'center', justifyContent:'center'
+      }}>
+        <ShoppingCart size={22} />
+        {totalQty > 0 && (
+          <span style={{
+            position:'absolute', top:-4, right:-4, background:'var(--red)',
+            color:'#fff', fontSize:10, fontWeight:800, width:18, height:18,
+            borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center'
+          }}>{totalQty > 9 ? '9+' : totalQty}</span>
+        )}
+      </button>
 
       {/* Mobile cart drawer */}
-      {showCartMobile && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCartMobile(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="font-semibold text-gray-900">Cart ({cartItemsCount})</h3>
-              <button onClick={() => setShowCartMobile(false)}>
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+      {showMobileCart && (
+        <div style={{ position:'fixed', inset:0, zIndex:50 }}>
+          <div onClick={() => setShowMobileCart(false)} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.5)' }} />
+          <div style={{
+            position:'absolute', bottom:0, left:0, right:0,
+            background:'var(--surface)', borderRadius:'20px 20px 0 0',
+            maxHeight:'88vh', display:'flex', flexDirection:'column'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 16px 0' }}>
+              <p style={{ fontSize:15, fontWeight:700 }}>Cart</p>
+              <button onClick={() => setShowMobileCart(false)} style={{ background:'none', border:'none', cursor:'pointer' }}><X size={18} /></button>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <CartPanel
-                cart={cart}
-                cartItemsCount={cartItemsCount}
-                cartSubtotal={cartSubtotal}
-                cartDiscount={cartDiscount}
-                cartTotal={cartTotal}
-                updateQuantity={updateQuantity}
-                removeFromCart={removeFromCart}
-                onCheckout={() => { setShowCartMobile(false); setShowCheckout(true) }}
-              />
-            </div>
+            <div style={{ flex:1, overflow:'hidden' }}><CartPanel /></div>
           </div>
         </div>
       )}
 
-      {/* USB Scanner modal */}
-      {showUSBScanner && (
-        <Modal onClose={() => setShowUSBScanner(false)} title="USB Barcode Scanner">
-          <p className="text-sm text-gray-600 mb-3">Point your USB scanner or type the barcode below:</p>
-          <input
-            type="text"
-            placeholder="Scan or enter barcode, then press Enter..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            autoFocus
-            onKeyDown={(e) => {
+      {/* USB Scanner */}
+      {showUSB && (
+        <Modal title="USB Barcode Scanner" onClose={() => setShowUSB(false)}>
+          <p style={{ fontSize:13, color:'var(--txt-2)', marginBottom:12 }}>Type or scan a barcode, then press Enter:</p>
+          <input className="input" autoFocus placeholder="Scan barcode here…"
+            onKeyDown={e => {
               if (e.key === 'Enter') {
-                const val = e.currentTarget.value.trim()
-                if (val) { handleBarcodeScan(val); setShowUSBScanner(false) }
+                const v = e.currentTarget.value.trim()
+                if (v) { handleBarcode(v); setShowUSB(false) }
               }
             }}
           />
-          <p className="text-xs text-gray-400 mt-2">Press Enter after scanning</p>
+          <p style={{ fontSize:11, color:'var(--txt-3)', marginTop:6 }}>Press Enter after scanning</p>
         </Modal>
       )}
 
-      {/* Camera scanner */}
-      {showCameraScanner && (
-        <BarcodeScanner
-          onScan={(code) => { handleBarcodeScan(code); setShowCameraScanner(false) }}
-          onClose={() => setShowCameraScanner(false)}
-          continuous={false}
-          showFlashlight={true}
-        />
+      {/* Camera */}
+      {showCamera && (
+        <BarcodeScanner onScan={c => { handleBarcode(c); setShowCamera(false) }} onClose={() => setShowCamera(false)} continuous={false} showFlashlight />
       )}
 
       {/* Checkout modal */}
       {showCheckout && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white w-full sm:rounded-2xl sm:max-w-lg max-h-[95vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
-              <h3 className="text-lg font-bold text-gray-900">Checkout</h3>
-              <button onClick={() => setShowCheckout(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.55)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:50 }} className="modal-center">
+          <div style={{
+            background:'var(--surface)', width:'100%', maxWidth:480,
+            borderRadius:'20px 20px 0 0', maxHeight:'94vh',
+            display:'flex', flexDirection:'column'
+          }} className="modal-rounded">
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+              <p style={{ fontSize:16, fontWeight:700 }}>Checkout</p>
+              <button onClick={() => setShowCheckout(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-2)' }}><X size={18} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {/* Order summary */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Subtotal ({cartItemsCount} items)</span>
-                  <span>KES {cartSubtotal.toLocaleString()}</span>
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
+              {/* Summary */}
+              <div style={{ background:'var(--bg)', borderRadius:'var(--radius)', padding:14, marginBottom:16 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                  <span style={{ fontSize:12, color:'var(--txt-2)' }}>Subtotal ({totalQty} items)</span>
+                  <span style={{ fontSize:12, color:'var(--txt-1)' }}>KES {subtotal.toLocaleString()}</span>
                 </div>
-                {cartDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Discount</span>
-                    <span>-KES {cartDiscount.toLocaleString()}</span>
+                {discount > 0 && (
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <span style={{ fontSize:12, color:'var(--green)' }}>Discount</span>
+                    <span style={{ fontSize:12, color:'var(--green)', fontWeight:600 }}>-KES {discount.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-base border-t pt-2">
-                  <span>Total</span>
-                  <span className="text-blue-600">KES {cartTotal.toLocaleString()}</span>
+                <div style={{ display:'flex', justifyContent:'space-between', paddingTop:8, borderTop:'1px dashed var(--border-md)', marginTop:4 }}>
+                  <span style={{ fontSize:14, fontWeight:700 }}>Total</span>
+                  <span style={{ fontSize:16, fontWeight:800, color:'var(--blue)' }}>KES {total.toLocaleString()}</span>
                 </div>
               </div>
 
               {/* Discount */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">Discount (Optional)</p>
-                <div className="flex gap-2 mb-2">
-                  <button
-                    onClick={() => setDiscountType(discountType === 'percentage' ? null : 'percentage')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 ${
-                      discountType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    <Percent className="h-3.5 w-3.5" /> Percentage
-                  </button>
-                  <button
-                    onClick={() => setDiscountType(discountType === 'fixed' ? null : 'fixed')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 ${
-                      discountType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    <DollarSign className="h-3.5 w-3.5" /> Fixed KES
-                  </button>
+              <div style={{ marginBottom:16 }}>
+                <p className="label">Discount (Optional)</p>
+                <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                  {([['pct','% Off'],['fixed','Fixed KES']] as const).map(([k,l]) => (
+                    <button key={k} onClick={() => setDiscType(discType === k ? null : k)}
+                      style={{
+                        flex:1, padding:'8px', borderRadius:'var(--radius-sm)',
+                        border:'1.5px solid', fontSize:12, fontWeight:600, cursor:'pointer',
+                        borderColor: discType === k ? 'var(--blue)' : 'var(--border)',
+                        background: discType === k ? 'var(--blue-lt)' : 'var(--surface)',
+                        color: discType === k ? 'var(--blue)' : 'var(--txt-2)',
+                      }}>
+                      {discType === k ? <CheckCircle2 size={12} style={{ display:'inline', marginRight:4 }} /> : null}
+                      {l}
+                    </button>
+                  ))}
                 </div>
-                {discountType && (
-                  <input
-                    type="number"
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
-                    placeholder={discountType === 'percentage' ? 'Enter % (e.g. 10)' : 'Enter amount (e.g. 500)'}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    max={discountType === 'percentage' ? '100' : cartSubtotal.toString()}
+                {discType && (
+                  <input className="input" type="number" value={discVal} onChange={e => setDiscVal(e.target.value)}
+                    placeholder={discType === 'pct' ? 'e.g. 10 (10%)' : 'e.g. 500'}
+                    min="0" max={discType === 'pct' ? '100' : subtotal.toString()}
                   />
                 )}
               </div>
 
               {/* Payment method */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">Payment Method</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {paymentMethods.map(({ key, label }) => (
-                    <button
-                      key={key}
-                      onClick={() => setPaymentMethod(key)}
-                      className={`py-2.5 rounded-lg text-sm font-medium transition-all ${
-                        paymentMethod === key
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
+              <div style={{ marginBottom:16 }}>
+                <p className="label">Payment Method</p>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+                  {PAY_METHODS.map(({ key, label }) => (
+                    <button key={key} onClick={() => setPayMethod(key)}
+                      style={{
+                        padding:'9px 4px', borderRadius:'var(--radius-sm)',
+                        border:'1.5px solid', fontSize:12, fontWeight:600, cursor:'pointer',
+                        borderColor: payMethod === key ? 'var(--blue)' : 'var(--border)',
+                        background: payMethod === key ? 'var(--blue)' : 'var(--surface)',
+                        color: payMethod === key ? '#fff' : 'var(--txt-2)',
+                      }}>
                       {label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Payment inputs */}
-              {paymentMethod === 'cash' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Cash Received (KES)</label>
-                    <input
-                      type="number"
-                      value={cashGiven}
-                      onChange={(e) => setCashGiven(e.target.value)}
-                      placeholder={`Minimum ${cartTotal.toLocaleString()}`}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                      min={cartTotal}
-                    />
-                  </div>
+              {/* Cash input */}
+              {payMethod === 'cash' && (
+                <div style={{ marginBottom:16 }}>
+                  <p className="label">Cash Received (KES)</p>
+                  <input className="input" type="number" value={cashGiven}
+                    onChange={e => setCashGiven(e.target.value)}
+                    placeholder={`Min KES ${total.toLocaleString()}`} min={total}
+                  />
                   {change > 0 && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex justify-between">
-                      <span className="text-green-800 font-medium text-sm">Change Due</span>
-                      <span className="text-green-700 font-bold">KES {change.toLocaleString()}</span>
+                    <div style={{
+                      marginTop:8, background:'var(--green-lt)', border:'1px solid #BBF7D0',
+                      borderRadius:'var(--radius-sm)', padding:'8px 12px',
+                      display:'flex', justifyContent:'space-between'
+                    }}>
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--green)' }}>Change Due</span>
+                      <span style={{ fontSize:13, fontWeight:800, color:'var(--green)' }}>KES {change.toLocaleString()}</span>
                     </div>
                   )}
                 </div>
               )}
 
-              {paymentMethod === 'mixed' && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+              {/* Mixed */}
+              {payMethod === 'mixed' && (
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                     {[
-                      { label: 'Cash', value: cashGiven, setter: setCashGiven },
-                      { label: 'M-Pesa', value: mpesaAmount, setter: setMpesaAmount },
-                      { label: 'Card', value: cardAmount, setter: setCardAmount },
-                      { label: 'Bank Transfer', value: bankAmount, setter: setBankAmount },
-                      { label: 'Credit Account', value: creditAmount, setter: setCreditAmount },
-                    ].map(({ label, value, setter }) => (
-                      <div key={label}>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">{label} (KES)</label>
-                        <input
-                          type="number"
-                          value={value}
-                          onChange={(e) => setter(e.target.value)}
-                          placeholder="0"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                          min="0"
-                        />
+                      ['Cash', cashGiven, setCashGiven],
+                      ['M-Pesa', mpesaAmt, setMpesaAmt],
+                      ['Card', cardAmt, setCardAmt],
+                      ['Bank Transfer', bankAmt, setBankAmt],
+                      ['Credit', creditAmt, setCreditAmt],
+                    ].map(([label, val, setter]: any) => (
+                      <div key={label as string}>
+                        <p className="label" style={{ marginBottom:3 }}>{label}</p>
+                        <input className="input" type="number" value={val} onChange={e => setter(e.target.value)} placeholder="0" min="0" />
                       </div>
                     ))}
                   </div>
-                  <div className={`rounded-lg p-3 flex justify-between text-sm font-medium ${
-                    mixedBalance <= 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-                  }`}>
-                    <span className={mixedBalance <= 0 ? 'text-green-800' : 'text-yellow-800'}>
-                      {mixedBalance <= 0 ? 'Fully Paid' : 'Remaining'}
+                  <div style={{
+                    borderRadius:'var(--radius-sm)', padding:'8px 12px',
+                    display:'flex', justifyContent:'space-between',
+                    background: mixedBal <= 0 ? 'var(--green-lt)' : 'var(--yellow-lt)',
+                    border: `1px solid ${mixedBal <= 0 ? '#BBF7D0' : '#FDE68A'}`
+                  }}>
+                    <span style={{ fontSize:12, fontWeight:600, color: mixedBal <= 0 ? 'var(--green)' : 'var(--yellow)' }}>
+                      {mixedBal <= 0 ? 'Fully Paid' : 'Remaining'}
                     </span>
-                    <span className={mixedBalance <= 0 ? 'text-green-700' : 'text-yellow-700'}>
-                      {mixedBalance <= 0 ? `KES ${Math.abs(mixedBalance).toLocaleString()} change` : `KES ${mixedBalance.toLocaleString()}`}
+                    <span style={{ fontSize:13, fontWeight:800, color: mixedBal <= 0 ? 'var(--green)' : 'var(--yellow)' }}>
+                      {mixedBal <= 0 ? `KES ${Math.abs(mixedBal).toLocaleString()} change` : `KES ${mixedBal.toLocaleString()}`}
                     </span>
                   </div>
                 </div>
@@ -587,204 +556,98 @@ export default function POSPage() {
 
               {/* Notes */}
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1">Notes (Optional)</label>
-                <textarea
-                  value={saleNotes}
-                  onChange={(e) => setSaleNotes(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={2}
-                  placeholder="Add any notes..."
-                />
+                <p className="label">Notes (Optional)</p>
+                <textarea className="input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes…" style={{ resize:'none' }} />
               </div>
             </div>
 
-            <div className="px-5 pb-5 pt-3 border-t flex-shrink-0">
-              <button
-                onClick={completeSale}
-                disabled={processing || cart.length === 0}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold text-base transition-colors flex items-center justify-center gap-2"
-              >
-                {processing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-5 w-5" />
-                    Complete Sale — KES {cartTotal.toLocaleString()}
-                  </>
-                )}
+            <div style={{ padding:'14px 20px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
+              <button onClick={completeSale} disabled={processing || cart.length === 0}
+                className="btn btn-success" style={{ width:'100%', padding:'13px', fontSize:14 }}>
+                {processing
+                  ? <><span className="spinner" /> Processing…</>
+                  : <><CheckCircle2 size={16} /> Complete Sale · KES {total.toLocaleString()}</>
+                }
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Receipt modal */}
+      {/* Receipt */}
       {showReceipt && completedSale && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle2 className="h-5 w-5" />
-                <h3 className="font-bold text-gray-900">Sale Complete!</h3>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50, padding:16 }}>
+          <div style={{
+            background:'var(--surface)', borderRadius:'var(--radius-lg)',
+            width:'100%', maxWidth:380, maxHeight:'92vh',
+            display:'flex', flexDirection:'column'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 18px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <CheckCircle2 size={16} color="var(--green)" />
+                <p style={{ fontSize:14, fontWeight:700 }}>Sale Complete!</p>
               </div>
-              <button onClick={() => setShowReceipt(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+              <button onClick={() => setShowReceipt(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-2)' }}><X size={16} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              <Receipt
-                sale={completedSale}
-                items={completedSale.items}
-                products={products}
-                shopName={businessSettings?.name || 'SMART POS'}
-                shopAddress={businessSettings?.address || ''}
-                shopPhone={businessSettings?.phone || ''}
-                shopEmail={businessSettings?.email || ''}
-                cashierName={user?.name || 'Cashier'}
-                change={completedSale.change || 0}
+            <div style={{ flex:1, overflowY:'auto' }}>
+              <Receipt sale={completedSale} items={completedSale.items} products={products}
+                shopName={bizSettings?.name} shopAddress={bizSettings?.address}
+                shopPhone={bizSettings?.phone} cashierName={user?.name} change={completedSale.change}
               />
             </div>
-            <div className="px-5 pb-5 pt-3 border-t flex gap-3 flex-shrink-0">
-              <button
-                onClick={() => setShowReceipt(false)}
-                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-              >
-                <Printer className="h-4 w-4" /> Print
+            <div style={{ display:'flex', gap:10, padding:'12px 18px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
+              <button onClick={() => setShowReceipt(false)} className="btn btn-ghost" style={{ flex:1 }}>Close</button>
+              <button onClick={() => window.print()} className="btn btn-primary" style={{ flex:1 }}>
+                <Printer size={14} /> Print
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        .product-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+          gap: 10px;
+        }
+        .hide-sm { }
+        @media (max-width: 1023px) {
+          .desktop-cart { display: none !important; }
+          .mobile-cart-fab { display: flex !important; }
+        }
+        @media (max-width: 480px) {
+          .hide-sm { display: none; }
+          .product-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+        }
+        @media (min-width: 768px) {
+          .modal-center { align-items: center !important; }
+          .modal-rounded { border-radius: var(--radius-lg) !important; }
+        }
+        .spinner {
+          display: inline-block;
+          width: 14px; height: 14px;
+          border: 2px solid rgba(255,255,255,.4);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
 
-// Cart panel component (shared between desktop sidebar and mobile drawer)
-function CartPanel({
-  cart, cartItemsCount, cartSubtotal, cartDiscount, cartTotal,
-  updateQuantity, removeFromCart, onCheckout
-}: {
-  cart: CartItem[]
-  cartItemsCount: number
-  cartSubtotal: number
-  cartDiscount: number
-  cartTotal: number
-  updateQuantity: (id: string, qty: number) => void
-  removeFromCart: (id: string) => void
-  onCheckout: () => void
-}) {
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 flex-shrink-0">
-        <ShoppingCart className="h-4 w-4 text-blue-600" />
-        <span className="font-semibold text-gray-900 text-sm">Cart</span>
-        {cartItemsCount > 0 && (
-          <span className="ml-auto bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
-            {cartItemsCount} items
-          </span>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {cart.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-            <ShoppingCart className="h-8 w-8 mb-2 opacity-30" />
-            <p className="text-xs">Cart is empty</p>
-            <p className="text-xs">Tap a product to add</p>
-          </div>
-        ) : (
-          cart.map((item) => (
-            <div key={item.id} className="bg-gray-50 rounded-xl p-3">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="font-medium text-gray-900 text-sm leading-tight flex-1">{item.name}</p>
-                <button
-                  onClick={() => removeFromCart(item.id)}
-                  className="text-red-400 hover:text-red-600 flex-shrink-0 p-0.5"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                    disabled={item.quantity <= 1}
-                    className="w-6 h-6 bg-white border border-gray-200 rounded-md flex items-center justify-center hover:bg-gray-100 disabled:opacity-40"
-                  >
-                    <Minus className="h-3 w-3" />
-                  </button>
-                  <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                    disabled={item.quantity >= item.stock}
-                    className="w-6 h-6 bg-white border border-gray-200 rounded-md flex items-center justify-center hover:bg-gray-100 disabled:opacity-40"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                </div>
-                <p className="font-bold text-gray-900 text-sm">
-                  KES {(item.price * item.quantity).toLocaleString()}
-                </p>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">@ KES {item.price.toLocaleString()} each</p>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="p-4 border-t border-gray-100 space-y-3 flex-shrink-0">
-        {cartDiscount > 0 && (
-          <div className="flex justify-between text-sm text-green-600">
-            <span>Discount</span>
-            <span className="font-medium">-KES {cartDiscount.toLocaleString()}</span>
-          </div>
-        )}
-        <div className="flex justify-between font-bold text-gray-900">
-          <span>Total</span>
-          <span className="text-blue-600">KES {cartTotal.toLocaleString()}</span>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:60, padding:16 }}>
+      <div style={{ background:'var(--surface)', borderRadius:'var(--radius-lg)', width:'100%', maxWidth:420 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 18px', borderBottom:'1px solid var(--border)' }}>
+          <p style={{ fontSize:14, fontWeight:700 }}>{title}</p>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-2)' }}><X size={16} /></button>
         </div>
-        <button
-          onClick={onCheckout}
-          disabled={cart.length === 0}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-sm transition-colors"
-        >
-          Checkout
-        </button>
+        <div style={{ padding:'16px 18px' }}>{children}</div>
       </div>
     </div>
-  )
-}
-
-function Modal({ children, title, onClose }: { children: React.ReactNode; title: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h3 className="font-bold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-// Fix missing import
-function Package({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-    </svg>
   )
 }
