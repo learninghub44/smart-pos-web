@@ -44,7 +44,7 @@ export default function POSPage() {
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    getCurrentAuthUser().then(u => { if (u) setUser(u) })
+    ;(async () => { const u = await getCurrentAuthUser(); if (u) setUser(u) })()
     loadProducts()
     loadBiz()
     setTimeout(() => searchRef.current?.focus(), 400)
