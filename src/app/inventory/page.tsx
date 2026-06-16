@@ -69,7 +69,7 @@ export default function InventoryPage() {
   const [lookupImageUrl, setLookupImageUrl] = useState<string>('')
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [formData, setFormData] = useState({
-    name: '', sku: '', barcode: '', unit: '',
+    name: '', sku: '', barcode: '', unit: '', brand: '', category: '',
     cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: ''
   })
 
@@ -96,6 +96,8 @@ export default function InventoryPage() {
           ...prev,
           name: prev.name || result.name || '',
           unit: prev.unit || result.unit || '',
+          brand: prev.brand || result.brand || '',
+          category: prev.category || result.category || '',
         }))
         if (result.imageUrl) setLookupImageUrl(result.imageUrl)
         setLookupResult({
@@ -144,7 +146,7 @@ export default function InventoryPage() {
     setLookupResult(null)
     setLookingUp(false)
     setLookupImageUrl('')
-    setFormData({ name: '', sku: '', barcode: generateBarcode(), unit: '', cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: '' })
+    setFormData({ name: '', sku: '', barcode: generateBarcode(), unit: '', brand: '', category: '', cost_price: '', selling_price: '', tax_rate: '', stock: '', minimum_stock: '' })
     setShowModal(true)
   }
 
@@ -155,6 +157,7 @@ export default function InventoryPage() {
     setLookupImageUrl(p.image_url || '')
     setFormData({
       name: p.name, sku: p.sku || '', barcode: p.barcode, unit: p.unit || '',
+      brand: '', category: '',
       cost_price: p.cost_price.toString(), selling_price: p.selling_price.toString(),
       tax_rate: p.tax_rate.toString(), stock: p.stock.toString(),
       minimum_stock: p.minimum_stock.toString()
@@ -177,7 +180,7 @@ export default function InventoryPage() {
     setSaving(true)
     const data = {
       name: formData.name, sku: formData.sku || null, barcode: formData.barcode,
-      unit: formData.unit || null, category_id: null, brand_id: null,
+      unit: formData.unit || null, brand: formData.brand || null, category: formData.category || null, category_id: null, brand_id: null,
       cost_price: parseFloat(formData.cost_price),
       selling_price: parseFloat(formData.selling_price),
       tax_rate: parseFloat(formData.tax_rate) || 0,
@@ -453,12 +456,103 @@ export default function InventoryPage() {
                 )}
 
                 <div className="px-5 pb-4 space-y-4">
+
                   {/* Barcode mini preview */}
                   {formData.barcode && (
                     <div className="p-2 bg-gray-50 rounded-xl flex justify-center border border-gray-100">
                       <BarcodeDisplay value={formData.barcode} width={180} height={55} />
                     </div>
                   )}
+
+                  {/* Product Name */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Product Name *</label>
+                    <input required type="text" value={formData.name}
+                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g. Coca Cola 500ml" />
+                  </div>
+
+                  {/* Brand & Category */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Brand</label>
+                      <input type="text" value={formData.brand}
+                        onChange={e => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. Coca Cola" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Category</label>
+                      <input type="text" value={formData.category}
+                        onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. Beverages" />
+                    </div>
+                  </div>
+
+                  {/* SKU & Unit */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">SKU</label>
+                      <input type="text" value={formData.sku}
+                        onChange={e => setFormData(prev => ({ ...prev, sku: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Optional" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Unit / Size</label>
+                      <input type="text" value={formData.unit}
+                        onChange={e => setFormData(prev => ({ ...prev, unit: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="pcs, kg, 500ml" />
+                    </div>
+                  </div>
+
+                  {/* Prices */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Cost Price (KES) *</label>
+                      <input required type="number" step="0.01" min="0" value={formData.cost_price}
+                        onChange={e => setFormData(prev => ({ ...prev, cost_price: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Selling Price (KES) *</label>
+                      <input required type="number" step="0.01" min="0" value={formData.selling_price}
+                        onChange={e => setFormData(prev => ({ ...prev, selling_price: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00" />
+                    </div>
+                  </div>
+
+                  {/* Stock */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Stock Qty *</label>
+                      <input required type="number" min="0" value={formData.stock}
+                        onChange={e => setFormData(prev => ({ ...prev, stock: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Min Stock Alert</label>
+                      <input type="number" min="0" value={formData.minimum_stock}
+                        onChange={e => setFormData(prev => ({ ...prev, minimum_stock: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="5" />
+                    </div>
+                  </div>
+
+                  {/* Tax rate */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Tax Rate (%)</label>
+                    <input type="number" step="0.1" min="0" max="100" value={formData.tax_rate}
+                      onChange={e => setFormData(prev => ({ ...prev, tax_rate: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0 = no tax, 16 = VAT" />
+                  </div>
 
                 </div>
 
