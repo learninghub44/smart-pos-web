@@ -83,7 +83,7 @@ export async function login(email: string, password: string): Promise<{ success:
       const cachedUser = await getCachedUser(email.trim())
       if (cachedUser) {
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(cachedUser))
-        return { success: true, user: cachedUser }
+        return { success: true, user: { ...cachedUser, branch_id: (cachedUser as any).branch_id || null, branch_name: (cachedUser as any).branch_name || null } }
       }
     } catch (_) {}
     return { success: false, error: 'Could not connect. Check your internet connection.' }
