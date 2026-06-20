@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings } from 'lucide-react'
-import { getCurrentAuthUser, isOwner, register } from '@/lib/auth'
+import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings, CreditCard, Pencil, Trash2 } from 'lucide-react'
+import { getCurrentAuthUser, isOwner, isAdmin, register } from '@/lib/auth'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax' | 'staff' | 'system'>('business')
+  const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax' | 'payment' | 'staff' | 'system'>('business')
   const [saving, setSaving] = useState(false)
   
   const [businessSettings, setBusinessSettings] = useState({
@@ -28,6 +28,13 @@ export default function SettingsPage() {
     vat_rate: 16,
     enabled: false
   })
+
+  // Payment methods (Till / Paybill / Send Money / Bank) shown on receipts
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([])
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<any>(null)
+  const [paymentForm, setPaymentForm] = useState({ type: 'till', label: '', number: '', account_name: '', active: true })
+  const [savingPayment, setSavingPayment] = useState(false)
 
   // Staff management state
   const [staffList, setStaffList] = useState<any[]>([])
@@ -96,6 +103,7 @@ export default function SettingsPage() {
           if (s.key === 'business') setBusinessSettings(s.value)
           if (s.key === 'receipt') setReceiptSettings(s.value)
           if (s.key === 'tax') setTaxSettings(s.value)
+          if (s.key === 'payment_methods') setPaymentMethods(s.value || [])
         })
         return
       }
@@ -108,9 +116,64 @@ export default function SettingsPage() {
       if (receipt) setReceiptSettings(receipt.value)
       const tax = await getSettingByKey('tax')
       if (tax) setTaxSettings(tax.value)
+      const payment = await getSettingByKey('payment_methods')
+      if (payment) setPaymentMethods(payment.value || [])
     } catch (error) {
       console.log('Error loading settings')
     }
+  }
+
+  // Persist the full payment methods array to Supabase + IndexedDB
+  const savePaymentMethods = async (methods: any[]) => {
+    setPaymentMethods(methods)
+    const now = new Date().toISOString()
+    try {
+      const { addSettingToDB, updateSettingToDB, getSettingByKey } = await import('@/lib/indexeddb')
+      const existing = await getSettingByKey('payment_methods')
+      if (existing) await updateSettingToDB({ id: existing.id, key: 'payment_methods', value: methods, updated_at: now })
+      else await addSettingToDB({ id: crypto.randomUUID(), key: 'payment_methods', value: methods, updated_at: now })
+    } catch (_) {}
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('settings').upsert({ key: 'payment_methods', value: methods, updated_at: now }, { onConflict: 'key' })
+    } catch (_) {}
+  }
+
+  const openAddPayment = () => {
+    setEditingPayment(null)
+    setPaymentForm({ type: 'till', label: '', number: '', account_name: '', active: true })
+    setShowPaymentModal(true)
+  }
+
+  const openEditPayment = (method: any) => {
+    setEditingPayment(method)
+    setPaymentForm({
+      type: method.type || 'till',
+      label: method.label || '',
+      number: method.number || '',
+      account_name: method.account_name || '',
+      active: method.active !== false
+    })
+    setShowPaymentModal(true)
+  }
+
+  const handleSavePayment = async () => {
+    if (!paymentForm.label.trim() || !paymentForm.number.trim()) return
+    setSavingPayment(true)
+    if (editingPayment) {
+      const updated = paymentMethods.map(m => m.id === editingPayment.id ? { ...m, ...paymentForm } : m)
+      await savePaymentMethods(updated)
+    } else {
+      const newMethod = { id: crypto.randomUUID(), ...paymentForm }
+      await savePaymentMethods([...paymentMethods, newMethod])
+    }
+    setSavingPayment(false)
+    setShowPaymentModal(false)
+  }
+
+  const handleDeletePayment = async (id: string) => {
+    if (!confirm('Remove this payment method? It will no longer appear on receipts.')) return
+    await savePaymentMethods(paymentMethods.filter(m => m.id !== id))
   }
 
   const saveSettings = async () => {
@@ -212,10 +275,12 @@ export default function SettingsPage() {
   }
 
   const owner = isOwner(user)
+  const admin = isAdmin(user)
   const tabs = [
     { id: 'business' as const, label: 'Business', icon: Building2 },
     { id: 'receipt' as const, label: 'Receipt', icon: Receipt },
     { id: 'tax' as const, label: 'Tax', icon: DollarSign },
+    ...(admin ? [{ id: 'payment' as const, label: 'Payment Methods', icon: CreditCard }] : []),
     ...(owner ? [{ id: 'staff' as const, label: 'Staff', icon: Users }] : []),
     { id: 'system' as const, label: 'System', icon: Settings }
   ]
@@ -432,6 +497,60 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {activeTab === 'payment' && (
+            <div className="space-y-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Payment Methods</h2>
+                  <p className="text-sm text-gray-500 mt-1">Till, Paybill, and Send Money numbers shown on every printed receipt</p>
+                </div>
+                <button
+                  onClick={openAddPayment}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 font-semibold text-sm flex-shrink-0"
+                >
+                  <Plus className="h-4 w-4" /> Add
+                </button>
+              </div>
+
+              {paymentMethods.length === 0 ? (
+                <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-8 text-center">
+                  <CreditCard className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No payment methods yet. Add a Till, Paybill, or Send Money number.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paymentMethods.map((m) => {
+                    const typeLabel = m.type === 'till' ? 'Till Number' : m.type === 'paybill' ? 'Paybill' : m.type === 'send_money' ? 'Send Money' : 'Bank Account'
+                    return (
+                      <div key={m.id} className="flex items-center justify-between gap-4 bg-white border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${m.active ? 'bg-green-50' : 'bg-gray-100'}`}>
+                            <CreditCard className={`h-4 w-4 ${m.active ? 'text-green-600' : 'text-gray-400'}`} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{m.label} <span className="text-gray-400 font-normal">· {typeLabel}</span></p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {m.number}{m.account_name ? ` · Acc: ${m.account_name}` : ''}
+                              {!m.active && <span className="text-amber-600 ml-2">Hidden from receipts</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => openEditPayment(m)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => handleDeletePayment(m.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Staff Tab */}
 
           {activeTab === 'system' && (
@@ -633,6 +752,76 @@ export default function SettingsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Payment Method Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="font-bold text-gray-900">{editingPayment ? 'Edit Payment Method' : 'Add Payment Method'}</h2>
+              <button onClick={() => setShowPaymentModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Type *</label>
+                <select value={paymentForm.type} onChange={e => setPaymentForm(p => ({ ...p, type: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="till">M-Pesa Till Number</option>
+                  <option value="paybill">M-Pesa Paybill</option>
+                  <option value="send_money">Send Money (Phone)</option>
+                  <option value="bank">Bank Account</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Label *</label>
+                <input type="text" value={paymentForm.label} onChange={e => setPaymentForm(p => ({ ...p, label: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Main Till" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+                  {paymentForm.type === 'send_money' ? 'Phone Number *' : paymentForm.type === 'bank' ? 'Account Number *' : 'Number *'}
+                </label>
+                <input type="text" value={paymentForm.number} onChange={e => setPaymentForm(p => ({ ...p, number: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={paymentForm.type === 'send_money' ? 'e.g. 0712 345 678' : 'e.g. 123456'} />
+              </div>
+              {(paymentForm.type === 'paybill' || paymentForm.type === 'bank') && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+                    {paymentForm.type === 'paybill' ? 'Account Number' : 'Bank & Branch'}
+                  </label>
+                  <input type="text" value={paymentForm.account_name} onChange={e => setPaymentForm(p => ({ ...p, account_name: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={paymentForm.type === 'paybill' ? 'e.g. your phone number or shop code' : 'e.g. Equity Bank, Kisumu'} />
+                </div>
+              )}
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="payment-active"
+                  checked={paymentForm.active}
+                  onChange={(e) => setPaymentForm(p => ({ ...p, active: e.target.checked }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="payment-active" className="text-sm font-medium text-gray-700">
+                  Show on printed receipts
+                </label>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="button" onClick={handleSavePayment} disabled={savingPayment || !paymentForm.label.trim() || !paymentForm.number.trim()}
+                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                  {savingPayment ? 'Saving...' : editingPayment ? 'Update' : 'Add'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

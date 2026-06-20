@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { 
   Search, Plus, Edit, Trash2, Package, AlertCircle, 
-  Camera, X, Loader2, CheckCircle2, ImageOff
+  Camera, X, Loader2, CheckCircle2, ImageOff, Truck
 } from 'lucide-react'
 import { 
   getAllProducts, addProductToDB, updateProductInDB, 
-  deleteProductFromDB, getProductByBarcode, syncProductsFromSupabase 
+  deleteProductFromDB, getProductByBarcode, syncProductsFromSupabase,
+  getAllCategories, addCategoryToDB, getAllBrands, addBrandToDB, getAllSuppliers
 } from '@/lib/indexeddb'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -21,6 +23,7 @@ interface Product {
   barcode: string
   category_id: string | null
   brand_id: string | null
+  supplier_id?: string | null
   brand?: string | null
   category?: string | null
   unit: string | null
@@ -37,7 +40,7 @@ interface Product {
 
 const EMPTY_FORM = {
   name: '', sku: '', barcode: '', unit: '',
-  brand: '', category: '',
+  category_id: '', brand_id: '', supplier_id: '',
   cost_price: '', selling_price: '', tax_rate: '0',
   stock: '', minimum_stock: '10',
   image_url: ''
@@ -53,6 +56,12 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'low' | 'out'>('all')
+
+  // Linked lookups: categories, brands, suppliers
+  const [categories, setCategories] = useState<any[]>([])
+  const [brands, setBrands] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [quickAdd, setQuickAdd] = useState<{ type: 'category' | 'brand' | null, value: string, saving: boolean }>({ type: null, value: '', saving: false })
   
   // Lookup state
   const [lookupLoading, setLookupLoading] = useState(false)
@@ -60,7 +69,25 @@ export default function InventoryPage() {
   const [lookupNotFound, setLookupNotFound] = useState(false)
   const barcodeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { loadProducts() }, [])
+  useEffect(() => { loadProducts(); loadLookups() }, [])
+
+  const loadLookups = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const [{ data: cats }, { data: brs }, { data: sups }] = await Promise.all([
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('brands').select('*').order('name'),
+        supabase.from('suppliers').select('*').order('name'),
+      ])
+      if (cats) { setCategories(cats); for (const c of cats) await addCategoryToDB(c) }
+      if (brs) { setBrands(brs); for (const b of brs) await addBrandToDB(b) }
+      if (sups) setSuppliers(sups)
+      if (cats && brs && sups) return
+    } catch {}
+    setCategories(await getAllCategories())
+    setBrands(await getAllBrands())
+    setSuppliers(await getAllSuppliers())
+  }
 
   // Auto-trigger lookup when barcode is typed (with debounce)
   const onBarcodeChange = (val: string) => {
@@ -81,12 +108,14 @@ export default function InventoryPage() {
       const result = await lookupBarcode(barcode)
       if (result) {
         setLookupResult(result)
+        const brandId = result.brand ? await findOrCreateBrand(result.brand) : null
+        const categoryId = result.category ? await findOrCreateCategory(result.category) : null
         // Auto-fill form fields from lookup
         setFormData(prev => ({
           ...prev,
           name: result.name || prev.name,
-          brand: result.brand || prev.brand,
-          category: result.category || prev.category,
+          brand_id: brandId || prev.brand_id,
+          category_id: categoryId || prev.category_id,
           unit: result.unit || prev.unit,
           image_url: result.imageUrl || prev.image_url,
         }))
@@ -97,6 +126,66 @@ export default function InventoryPage() {
       setLookupNotFound(true)
     }
     setLookupLoading(false)
+  }
+
+  // Find an existing brand/category by name (case-insensitive), or create one on the fly
+  const findOrCreateBrand = async (name: string): Promise<string | null> => {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    const existing = brands.find(b => b.name.toLowerCase() === trimmed.toLowerCase())
+    if (existing) return existing.id
+    return createBrand(trimmed)
+  }
+
+  const findOrCreateCategory = async (name: string): Promise<string | null> => {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    const existing = categories.find(c => c.name.toLowerCase() === trimmed.toLowerCase())
+    if (existing) return existing.id
+    return createCategory(trimmed)
+  }
+
+  const createBrand = async (name: string): Promise<string | null> => {
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const brand = { id, name, created_at: now, updated_at: now }
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { error } = await supabase.from('brands').insert(brand)
+      if (error) throw error
+    } catch { /* offline — saved locally only below */ }
+    await addBrandToDB(brand)
+    setBrands(prev => [...prev, brand].sort((a, b) => a.name.localeCompare(b.name)))
+    return id
+  }
+
+  const createCategory = async (name: string): Promise<string | null> => {
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const category = { id, name, parent_id: null, created_at: now, updated_at: now }
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { error } = await supabase.from('categories').insert(category)
+      if (error) throw error
+    } catch { /* offline — saved locally only below */ }
+    await addCategoryToDB(category)
+    setCategories(prev => [...prev, category].sort((a, b) => a.name.localeCompare(b.name)))
+    return id
+  }
+
+  const handleQuickAddSubmit = async () => {
+    if (!quickAdd.type || !quickAdd.value.trim()) return
+    setQuickAdd(prev => ({ ...prev, saving: true }))
+    const id = quickAdd.type === 'brand'
+      ? await createBrand(quickAdd.value.trim())
+      : await createCategory(quickAdd.value.trim())
+    if (id) {
+      setFormData(prev => ({
+        ...prev,
+        ...(quickAdd.type === 'brand' ? { brand_id: id } : { category_id: id })
+      }))
+    }
+    setQuickAdd({ type: null, value: '', saving: false })
   }
 
   const handleBarcodeScan = async (barcode: string) => {
@@ -154,12 +243,23 @@ export default function InventoryPage() {
 
   const openEdit = (product: Product) => {
     setEditingProduct(product)
+    // Legacy products may only have a text brand/category with no _id set —
+    // fall back to matching by name so existing data still shows correctly.
+    const legacyBrand = (product as any).brand as string | undefined
+    const legacyCategory = (product as any).category as string | undefined
+    const resolvedBrandId = product.brand_id
+      || (legacyBrand ? brands.find(b => b.name.toLowerCase() === legacyBrand.toLowerCase())?.id : null)
+      || ''
+    const resolvedCategoryId = product.category_id
+      || (legacyCategory ? categories.find(c => c.name.toLowerCase() === legacyCategory.toLowerCase())?.id : null)
+      || ''
     setFormData({
       name: product.name,
       sku: product.sku || '',
       barcode: product.barcode,
-      brand: (product as any).brand || '',
-      category: (product as any).category || '',
+      category_id: resolvedCategoryId,
+      brand_id: resolvedBrandId,
+      supplier_id: product.supplier_id || '',
       unit: product.unit || '',
       cost_price: product.cost_price.toString(),
       selling_price: product.selling_price.toString(),
@@ -221,13 +321,17 @@ export default function InventoryPage() {
     const now = new Date().toISOString()
     const branchId = getActiveBranchId()
 
+    const selectedCategory = categories.find(c => c.id === formData.category_id)
+    const selectedBrand = brands.find(b => b.id === formData.brand_id)
+
     // Build clean product object — only columns that exist in schema
     const productData: any = {
       name: formData.name.trim(),
       sku: formData.sku.trim() || null,
       barcode: formData.barcode.trim(),
-      category_id: null,
-      brand_id: null,
+      category_id: formData.category_id || null,
+      brand_id: formData.brand_id || null,
+      supplier_id: formData.supplier_id || null,
       unit: formData.unit.trim() || null,
       cost_price: parseFloat(formData.cost_price) || 0,
       selling_price: parseFloat(formData.selling_price),
@@ -241,12 +345,13 @@ export default function InventoryPage() {
     // Add branch if it exists (multi-branch support)
     if (branchId) productData.branch_id = branchId
 
-    // Add text brand/category if those columns exist (migration 001 may not be run yet)
-    // We'll try with them and retry without if Supabase rejects
+    // Add denormalized text brand/category (some installs have these as legacy
+    // text columns alongside the _id columns). We'll try with them and retry
+    // without if Supabase rejects.
     const productDataWithMeta = {
       ...productData,
-      brand: formData.brand.trim() || null,
-      category: formData.category.trim() || null,
+      brand: selectedBrand?.name || null,
+      category: selectedCategory?.name || null,
     }
 
     try {
@@ -264,12 +369,18 @@ export default function InventoryPage() {
         }
       }
 
-      // Try with brand/category first
+      // Try with brand/category text + supplier_id first
       let err = await tryInsert(productDataWithMeta)
 
-      // If failed (columns don't exist yet), retry without
+      // If failed (legacy brand/category text columns don't exist), retry without them
       if (err) {
         err = await tryInsert(productData)
+      }
+
+      // If still failed (supplier_id column doesn't exist — migration 002 not run yet), drop it too
+      if (err) {
+        const { supplier_id, ...withoutSupplier } = productData
+        err = await tryInsert(withoutSupplier)
         if (err) throw err
       }
 
@@ -602,25 +713,55 @@ export default function InventoryPage() {
               {/* Brand + Category */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Brand</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Brand</label>
+                    <button type="button" onClick={() => setQuickAdd({ type: 'brand', value: '', saving: false })} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+                      + New
+                    </button>
+                  </div>
+                  <select
+                    value={formData.brand_id}
+                    onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. Coca-Cola"
-                  />
+                  >
+                    <option value="">No brand</option>
+                    {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 block mb-1.5">Category</label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Category</label>
+                    <button type="button" onClick={() => setQuickAdd({ type: 'category', value: '', saving: false })} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+                      + New
+                    </button>
+                  </div>
+                  <select
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. Beverages"
-                  />
+                  >
+                    <option value="">No category</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
+              </div>
+
+              {/* Supplier */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-semibold text-gray-700">Supplier</label>
+                  <Link href="/suppliers" className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                    <Truck className="h-3 w-3" /> Manage suppliers
+                  </Link>
+                </div>
+                <select
+                  value={formData.supplier_id}
+                  onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">No supplier</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
 
               {/* SKU + Unit */}
@@ -791,6 +932,43 @@ export default function InventoryPage() {
           continuous={false}
           showFlashlight={true}
         />
+      )}
+
+      {/* Quick-add Brand/Category */}
+      {quickAdd.type && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] px-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5">
+            <h3 className="text-base font-bold text-gray-900 mb-3">
+              New {quickAdd.type === 'brand' ? 'Brand' : 'Category'}
+            </h3>
+            <input
+              type="text"
+              autoFocus
+              value={quickAdd.value}
+              onChange={(e) => setQuickAdd(prev => ({ ...prev, value: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit() }}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 mb-4"
+              placeholder={quickAdd.type === 'brand' ? 'e.g. Coca-Cola' : 'e.g. Beverages'}
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setQuickAdd({ type: null, value: '', saving: false })}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickAddSubmit}
+                disabled={quickAdd.saving || !quickAdd.value.trim()}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {quickAdd.saving ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

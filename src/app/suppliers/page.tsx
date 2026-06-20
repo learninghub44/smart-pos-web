@@ -10,7 +10,7 @@ export default function SuppliersPage() {
   const [editing, setEditing]     = useState<any>(null)
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState<string|null>(null)
-  const [form, setForm]           = useState({ name:'', contact_person:'', phone:'', email:'', address:'' })
+  const [form, setForm]           = useState({ name:'', contact_person:'', phone:'', email:'', address:'', kra_pin:'', payment_terms:'', lead_time_days:'' })
 
   useEffect(() => { load() }, [])
 
@@ -30,8 +30,8 @@ export default function SuppliersPage() {
     s.phone?.includes(search)
   )
 
-  const openAdd = () => { setEditing(null); setForm({ name:'', contact_person:'', phone:'', email:'', address:'' }); setError(null); setShowModal(true) }
-  const openEdit = (s: any) => { setEditing(s); setForm({ name:s.name||'', contact_person:s.contact_person||'', phone:s.phone||'', email:s.email||'', address:s.address||'' }); setError(null); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setForm({ name:'', contact_person:'', phone:'', email:'', address:'', kra_pin:'', payment_terms:'', lead_time_days:'' }); setError(null); setShowModal(true) }
+  const openEdit = (s: any) => { setEditing(s); setForm({ name:s.name||'', contact_person:s.contact_person||'', phone:s.phone||'', email:s.email||'', address:s.address||'', kra_pin:s.kra_pin||'', payment_terms:s.payment_terms||'', lead_time_days:s.lead_time_days?.toString()||'' }); setError(null); setShowModal(true) }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this supplier?')) return
@@ -43,10 +43,11 @@ export default function SuppliersPage() {
     if (!form.name.trim()) return setError('Supplier name is required')
     setSaving(true); setError(null)
     const now = new Date().toISOString()
+    const payload = { ...form, lead_time_days: form.lead_time_days ? parseInt(form.lead_time_days) : null }
     try {
       const { supabase } = await import('@/lib/supabase')
-      if (editing) await supabase.from('suppliers').update({ ...form, updated_at: now }).eq('id', editing.id)
-      else await supabase.from('suppliers').insert({ ...form, id: crypto.randomUUID(), created_at: now, updated_at: now })
+      if (editing) await supabase.from('suppliers').update({ ...payload, updated_at: now }).eq('id', editing.id)
+      else await supabase.from('suppliers').insert({ ...payload, id: crypto.randomUUID(), created_at: now, updated_at: now })
     } catch {}
     setSaving(false); setShowModal(false); load()
   }
@@ -57,6 +58,17 @@ export default function SuppliersPage() {
     { key:'phone', label:'Phone', placeholder:'e.g. 0712 345 678' },
     { key:'email', label:'Email', placeholder:'e.g. orders@supplier.co.ke', type:'email' },
     { key:'address', label:'Address', placeholder:'e.g. Industrial Area, Nairobi' },
+    { key:'kra_pin', label:'KRA PIN', placeholder:'e.g. P051234567X' },
+    { key:'payment_terms', label:'Payment Terms', type:'select', options:[
+      { value:'', label:'Select terms…' },
+      { value:'Cash on Delivery', label:'Cash on Delivery' },
+      { value:'Net 7', label:'Net 7 days' },
+      { value:'Net 14', label:'Net 14 days' },
+      { value:'Net 30', label:'Net 30 days' },
+      { value:'Net 60', label:'Net 60 days' },
+      { value:'Advance Payment', label:'Advance Payment' },
+    ] },
+    { key:'lead_time_days', label:'Lead Time (days)', type:'number', placeholder:'e.g. 3' },
   ]
 
   return (
@@ -78,20 +90,25 @@ export default function SuppliersPage() {
       <div className="card table-wrap desktop-only">
         <table className="tbl">
           <thead>
-            <tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Email</th><th style={{ textAlign:'right' }}>Actions</th></tr>
+            <tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Email</th><th>Terms</th><th style={{ textAlign:'right' }}>Actions</th></tr>
           </thead>
           <tbody>
             {filtered.length === 0
-              ? <tr><td colSpan={5}><div className="empty"><Truck size={28}/><p>No suppliers yet</p></div></td></tr>
+              ? <tr><td colSpan={6}><div className="empty"><Truck size={28}/><p>No suppliers yet</p></div></td></tr>
               : filtered.map(s => (
                 <tr key={s.id}>
                   <td>
                     <p style={{ fontSize:13, fontWeight:700, color:'var(--txt-1)' }}>{s.name}</p>
                     {s.address && <p style={{ fontSize:11, color:'var(--txt-3)' }}>{s.address}</p>}
+                    {s.kra_pin && <p style={{ fontSize:11, color:'var(--txt-3)' }}>PIN: {s.kra_pin}</p>}
                   </td>
                   <td style={{ fontSize:13, color:'var(--txt-2)' }}>{s.contact_person || '—'}</td>
                   <td style={{ fontSize:13, color:'var(--txt-2)' }}>{s.phone || '—'}</td>
                   <td style={{ fontSize:13, color:'var(--txt-2)' }}>{s.email || '—'}</td>
+                  <td style={{ fontSize:13, color:'var(--txt-2)' }}>
+                    {s.payment_terms || '—'}
+                    {s.lead_time_days ? <span style={{ display:'block', fontSize:11, color:'var(--txt-3)' }}>{s.lead_time_days}d lead time</span> : null}
+                  </td>
                   <td style={{ textAlign:'right' }}>
                     <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
                       <button onClick={() => openEdit(s)} className="btn btn-ghost btn-icon"><Edit size={13}/></button>
@@ -134,7 +151,13 @@ export default function SuppliersPage() {
               {fields.map(f => (
                 <div key={f.key}>
                   <p className="label">{f.label}</p>
-                  <input className="input" type={f.type||'text'} value={(form as any)[f.key]} onChange={e => setForm({...form,[f.key]:e.target.value})} placeholder={f.placeholder} />
+                  {f.type === 'select' ? (
+                    <select className="input" value={(form as any)[f.key]} onChange={e => setForm({...form,[f.key]:e.target.value})}>
+                      {f.options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : (
+                    <input className="input" type={f.type||'text'} value={(form as any)[f.key]} onChange={e => setForm({...form,[f.key]:e.target.value})} placeholder={f.placeholder} />
+                  )}
                 </div>
               ))}
             </div>

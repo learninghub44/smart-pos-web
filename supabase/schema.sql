@@ -72,9 +72,16 @@ CREATE TABLE suppliers (
   phone VARCHAR(20),
   email VARCHAR(255),
   address TEXT,
+  kra_pin VARCHAR(50),
+  payment_terms VARCHAR(100),
+  lead_time_days INTEGER,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Link products to a supplier (added after suppliers table exists)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES suppliers(id);
+CREATE INDEX IF NOT EXISTS idx_products_supplier ON products(supplier_id);
 
 -- Purchases table
 CREATE TABLE purchases (

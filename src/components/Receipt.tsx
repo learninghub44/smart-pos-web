@@ -40,7 +40,8 @@ export default function Receipt({
       const { getSettingByKey } = await import('@/lib/indexeddb')
       const business = await getSettingByKey('business')
       const receipt = await getSettingByKey('receipt')
-      setSettings({ business: business?.value, receipt: receipt?.value })
+      const payment = await getSettingByKey('payment_methods')
+      setSettings({ business: business?.value, receipt: receipt?.value, paymentMethods: payment?.value || [] })
     } catch {}
   }
 
@@ -66,6 +67,9 @@ export default function Receipt({
   const bizPhone = settings?.business?.phone || shopPhone
   const bizEmail = settings?.business?.email || shopEmail
   const footer = settings?.receipt?.footer || receiptFooter || 'Thank you for your business!'
+  const activePaymentMethods = (settings?.paymentMethods || []).filter((m: any) => m.active !== false)
+  const paymentTypeLabel = (type: string) =>
+    type === 'till' ? 'TILL' : type === 'paybill' ? 'PAYBILL' : type === 'send_money' ? 'SEND MONEY' : 'BANK'
 
   // Resolve product names from items (items may have product_name or product_id)
   const getItemName = (item: any) => {
@@ -81,11 +85,14 @@ export default function Receipt({
   return (
     <div id="receipt" ref={receiptRef} className="p-4 bg-white text-xs">
       {/* Header */}
-      <div className="text-center mb-3 pb-3 border-b border-dashed border-gray-400">
-        <p className="font-bold text-base uppercase tracking-wider">{bizName}</p>
-        {bizAddress && <p className="text-gray-600 text-xs mt-0.5">{bizAddress}</p>}
-        {bizPhone && <p className="text-gray-600 text-xs">Tel: {bizPhone}</p>}
-        {bizEmail && <p className="text-gray-600 text-xs">{bizEmail}</p>}
+      <div className="text-center mb-3 pb-2.5 border-b-2 border-gray-900">
+        <p className="font-bold text-base uppercase tracking-wide leading-tight">{bizName}</p>
+        {bizAddress && <p className="text-gray-600 text-xs mt-1">{bizAddress}</p>}
+        {(bizPhone || bizEmail) && (
+          <p className="text-gray-600 text-xs mt-0.5">
+            {bizPhone}{bizPhone && bizEmail ? '  ·  ' : ''}{bizEmail}
+          </p>
+        )}
       </div>
 
       {/* Meta */}
@@ -132,7 +139,7 @@ export default function Receipt({
             <span>-KES {Number(sale.discount_amount).toLocaleString()}</span>
           </div>
         )}
-        <div className="flex justify-between font-bold text-sm border-t border-dashed border-gray-400 pt-1 mt-1">
+        <div className="flex justify-between font-bold text-sm border-t-2 border-gray-900 pt-1.5 mt-1.5">
           <span>TOTAL</span>
           <span>KES {Number(sale.total_amount).toLocaleString()}</span>
         </div>
@@ -170,11 +177,30 @@ export default function Receipt({
         </div>
       )}
 
+      {/* Pay via — Till / Paybill / Send Money / Bank */}
+      {activePaymentMethods.length > 0 && (
+        <div className="border-t border-dashed border-gray-400 pt-2 mb-3">
+          <p className="font-bold text-center mb-1.5 tracking-wide">PAY VIA</p>
+          <div className="space-y-1">
+            {activePaymentMethods.map((m: any) => (
+              <div key={m.id} className="flex justify-between gap-2">
+                <span className="text-gray-500">{paymentTypeLabel(m.type)}{m.label ? ` (${m.label})` : ''}:</span>
+                <span className="font-semibold text-right">
+                  {m.number}{m.account_name ? ` · ${m.account_name}` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
-      <div className="border-t border-dashed border-gray-400 pt-2 text-center text-gray-500 text-xs">
-        <p className="font-medium">{footer}</p>
+      <div className="border-t-2 border-gray-900 pt-2.5 text-center text-gray-500 text-xs">
+        <p className="font-medium text-gray-700">{footer}</p>
         <p className="mt-1">Keep receipt for returns/exchanges</p>
-        <p className="font-bold mt-1">PIN: {sale.receipt_pin}</p>
+        <div className="inline-block border border-gray-400 rounded px-3 py-1 mt-2">
+          <p className="font-bold text-gray-900 tracking-wide">PIN: {sale.receipt_pin}</p>
+        </div>
       </div>
     </div>
   )
