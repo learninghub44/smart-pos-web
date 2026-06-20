@@ -50,7 +50,7 @@ export default function Receipt({
       @media print {
         @page { size: 80mm auto; margin: 0; }
         body { margin: 0; padding: 0; }
-        #receipt { width: 72mm; padding: 4mm; font-family: 'Courier New', monospace; font-size: 11px; }
+        #receipt { width: 72mm; padding: 4mm; font-family: 'DM Sans', sans-serif; font-size: 11px; }
       }
     `
   })
@@ -79,7 +79,7 @@ export default function Receipt({
   }
 
   return (
-    <div id="receipt" ref={receiptRef} className="p-4 bg-white font-mono text-xs">
+    <div id="receipt" ref={receiptRef} className="p-4 bg-white text-xs">
       {/* Header */}
       <div className="text-center mb-3 pb-3 border-b border-dashed border-gray-400">
         <p className="font-bold text-base uppercase tracking-wider">{bizName}</p>

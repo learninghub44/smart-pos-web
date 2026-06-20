@@ -396,7 +396,7 @@ export default function InventoryPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className="text-sm font-mono text-gray-700">{product.barcode}</p>
+                      <p className="text-sm text-gray-700">{product.barcode}</p>
                       {product.sku && <p className="text-xs text-gray-400">SKU: {product.sku}</p>}
                     </td>
                     <td className="px-5 py-3.5 text-right">
@@ -464,7 +464,7 @@ export default function InventoryPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm">{product.name}</p>
                   {(product as any).brand && <p className="text-xs text-gray-400">{(product as any).brand}</p>}
-                  <p className="text-xs text-gray-400 font-mono">{product.barcode}</p>
+                  <p className="text-xs text-gray-400">{product.barcode}</p>
                 </div>
                 <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${
                   stockStatus === 'out' ? 'bg-red-100 text-red-700' :
@@ -521,7 +521,7 @@ export default function InventoryPage() {
                     required
                     value={formData.barcode}
                     onChange={(e) => onBarcodeChange(e.target.value)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Scan, or type barcode here..."
                     autoFocus={!editingProduct}
                   />

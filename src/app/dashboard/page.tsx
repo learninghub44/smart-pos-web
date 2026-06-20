@@ -273,7 +273,7 @@ export default function DashboardPage() {
               padding:'11px 18px', borderBottom: i < recent.length-1 ? '1px solid var(--border)' : 'none'
             }}>
               <div>
-                <p style={{ fontSize:12, fontWeight:700, fontFamily:'monospace', color:'var(--txt-1)' }}>{t.pin}</p>
+                <p style={{ fontSize:12, fontWeight:700, color:'var(--txt-1)' }}>{t.pin}</p>
                 <p style={{ fontSize:11, color:'var(--txt-3)', marginTop:1 }}>
                   {t.items} item{t.items !== 1 ? 's' : ''} · {t.time}
                 </p>

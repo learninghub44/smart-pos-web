@@ -131,7 +131,7 @@ export default function SalesHistoryPage() {
               ) : filtered.map(sale => (
                 <tr key={sale.id}>
                   <td>
-                    <p style={{ fontSize:12, fontFamily:'monospace', fontWeight:700 }}>{sale.receipt_pin}</p>
+                    <p style={{ fontSize:12, fontWeight:700 }}>{sale.receipt_pin}</p>
                     {sale.receipt_number && <p style={{ fontSize:11, color:'var(--txt-3)' }}>{sale.receipt_number}</p>}
                   </td>
                   <td style={{ color:'var(--txt-2)', fontSize:12 }}>{fmt(sale.created_at)}</td>
