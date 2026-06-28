@@ -1,92 +1,187 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Search, Download, RefreshCw } from 'lucide-react'
+import { Search, Download, RefreshCw, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 export default function SalesHistoryPage() {
-  const [sales, setSales] = useState<any[]>([])
+  const [sales, setSales]     = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch]   = useState('')
   const [from, setFrom] = useState(() => { const d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0] })
-  const [to, setTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [to, setTo]     = useState(() => new Date().toISOString().split('T')[0])
 
   useEffect(() => { load() }, [from, to])
 
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/sales?from=${from}T00:00:00Z&to=${to}T23:59:59Z&limit=200`)
+      const res = await fetch(`/api/sales?from=${from}T00:00:00Z&to=${to}T23:59:59Z&limit=500`)
       if (res.ok) setSales(await res.json())
     } catch {}
     setLoading(false)
   }
 
   const filtered = sales.filter(s =>
-    !search || (s.receipt_pin||'').toLowerCase().includes(search.toLowerCase()) || (s.customer_name||'').toLowerCase().includes(search.toLowerCase())
+    !search ||
+    (s.receipt_pin||'').toLowerCase().includes(search.toLowerCase()) ||
+    (s.customer_name||'').toLowerCase().includes(search.toLowerCase())
   )
-  const total = filtered.reduce((a,s)=>a+Number(s.total_amount),0)
+
+  const total   = filtered.reduce((a,s)=>a+Number(s.total_amount),0)
+  const avgSale = filtered.length ? total/filtered.length : 0
+
+  function exportXlsx() {
+    const rows = filtered.map((s,i) => ({
+      '#':              i+1,
+      'Receipt':        s.receipt_pin,
+      'Date':           new Date(s.created_at).toLocaleDateString('en-KE'),
+      'Time':           new Date(s.created_at).toLocaleTimeString('en-KE'),
+      'Customer':       s.customer_name||'Walk-in',
+      'Items':          s.item_count||'',
+      'Subtotal (KES)': Number(s.subtotal||0).toFixed(2),
+      'Tax (KES)':      Number(s.tax_amount||0).toFixed(2),
+      'Discount (KES)': Number(s.discount_amount||0).toFixed(2),
+      'Total (KES)':    Number(s.total_amount||0).toFixed(2),
+      'Payment':        s.payment_method||'',
+      'Cashier':        s.cashier_name||'',
+      'Branch':         s.branch_name||'',
+      'Status':         s.status||'completed',
+    }))
+
+    // Summary rows
+    rows.push({} as any)
+    rows.push({ '#': 'SUMMARY', 'Receipt': '', 'Date': '', 'Time': '', 'Customer': '', 'Items': '', 'Subtotal (KES)': '', 'Tax (KES)': '', 'Discount (KES)': '', 'Total (KES)': '', 'Payment': '', 'Cashier': '', 'Branch': '', 'Status': '' } as any)
+    rows.push({ '#': 'Total Sales',      'Total (KES)': filtered.length } as any)
+    rows.push({ '#': 'Total Revenue',    'Total (KES)': total.toFixed(2) } as any)
+    rows.push({ '#': 'Average Sale',     'Total (KES)': avgSale.toFixed(2) } as any)
+    rows.push({ '#': 'Period',           'Total (KES)': `${from} → ${to}` } as any)
+    rows.push({ '#': 'Exported',         'Total (KES)': new Date().toLocaleString('en-KE') } as any)
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+
+    // Column widths
+    ws['!cols'] = [
+      {wch:4},{wch:12},{wch:12},{wch:10},{wch:20},{wch:6},
+      {wch:14},{wch:12},{wch:14},{wch:14},{wch:12},{wch:18},{wch:16},{wch:12}
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales History')
+    XLSX.writeFile(wb, `sales-${from}-to-${to}.xlsx`)
+  }
 
   return (
-    <div style={{ maxWidth:1100, margin:'0 auto' }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, gap:12, flexWrap:'wrap' }}>
-        <h1 style={{ fontSize:20, fontWeight:700, color:'var(--txt-1)' }}>Sales History</h1>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-          <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="input" style={{ fontSize:12 }}/>
-          <input type="date" value={to} onChange={e=>setTo(e.target.value)} className="input" style={{ fontSize:12 }}/>
-          <button onClick={load} className="btn btn-ghost"><RefreshCw size={14}/></button>
-        </div>
+    <div className="xl-page">
+      {/* Toolbar */}
+      <div className="xl-toolbar">
+        <span className="xl-toolbar-title">Sales History</span>
+        <div className="xl-toolbar-sep"/>
+        <FileSpreadsheet size={13} color="var(--xl-green)"/>
+        <button onClick={exportXlsx} className="btn btn-primary" disabled={filtered.length===0}>
+          <Download size={12}/> Export .xlsx
+        </button>
+        <div className="xl-toolbar-sep"/>
+        <input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="input"/>
+        <span style={{ fontSize:11, color:'var(--txt-3)' }}>to</span>
+        <input type="date" value={to}   onChange={e=>setTo(e.target.value)}   className="input"/>
+        <button onClick={load} className="btn btn-ghost btn-icon"><RefreshCw size={13}/></button>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10, marginBottom:16 }}>
+      {/* Formula bar / search */}
+      <div className="xl-formulabar">
+        <div className="xl-formulabar-label"><Search size={11} style={{marginRight:4}}/>SEARCH</div>
+        <input
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          placeholder="Filter by receipt number or customer name…"
+        />
+        {search && (
+          <button onClick={()=>setSearch('')} className="btn btn-ghost" style={{ height:28, borderRadius:0, borderLeft:'1px solid var(--border)' }}>
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* KPI row */}
+      <div className="xl-kpi-row" style={{ margin:'0', borderRadius:0, borderLeft:'none', borderRight:'none' }}>
         {[
-          { label:'Total Sales', value:filtered.length },
-          { label:'Revenue', value:`KES ${Math.round(total).toLocaleString()}` },
-          { label:'Avg Sale', value:`KES ${filtered.length?Math.round(total/filtered.length).toLocaleString():0}` },
-        ].map(s=>(
-          <div key={s.label} className="card" style={{ padding:'12px 16px' }}>
-            <p style={{ fontSize:11, fontWeight:600, color:'var(--txt-3)', textTransform:'uppercase', marginBottom:4 }}>{s.label}</p>
-            <p style={{ fontSize:18, fontWeight:800, color:'var(--txt-1)' }}>{s.value}</p>
+          { label:'Total Sales',    value: filtered.length },
+          { label:'Total Revenue',  value: `KES ${Math.round(total).toLocaleString()}` },
+          { label:'Average Sale',   value: `KES ${Math.round(avgSale).toLocaleString()}` },
+          { label:'Cash Sales',     value: filtered.filter(s=>s.payment_method==='cash').length },
+          { label:'M-Pesa / Card',  value: filtered.filter(s=>s.payment_method!=='cash').length },
+          { label:'Period',         value: `${from} → ${to}` },
+        ].map(k => (
+          <div key={k.label} className="xl-kpi" style={{ padding:'8px 12px' }}>
+            <div className="xl-kpi-label">{k.label}</div>
+            <div className="xl-kpi-value" style={{ fontSize:15 }}>{k.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="card" style={{ overflow:'hidden' }}>
-        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', gap:8 }}>
-          <div style={{ position:'relative', flex:1 }}>
-            <Search size={14} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--txt-3)' }}/>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search receipt or customer…" className="input" style={{ paddingLeft:30, width:'100%', fontSize:12 }}/>
-          </div>
-        </div>
-        {loading?(
-          <div style={{ padding:40, textAlign:'center', color:'var(--txt-3)' }}>Loading…</div>
-        ):(
-          <div style={{ overflow:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom:'1px solid var(--border)' }}>
-                  {['Receipt','Date','Items','Method','Customer','Total'].map(h=>(
-                    <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--txt-3)', textTransform:'uppercase', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
+      {/* Grid */}
+      <div style={{ flex:1, overflow:'auto', borderTop:'1px solid var(--border)' }}>
+        {loading ? (
+          <div className="loading-center"><div className="spinner"/><span>Loading sales…</span></div>
+        ) : (
+          <table className="xl-grid" style={{ minWidth:900 }}>
+            <thead>
+              <tr>
+                <th className="row-num">#</th>
+                <th>Receipt</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Customer</th>
+                <th className="num">Items</th>
+                <th className="num">Subtotal</th>
+                <th className="num">Tax</th>
+                <th className="num">Discount</th>
+                <th className="num">Total (KES)</th>
+                <th>Payment</th>
+                <th>Cashier</th>
+                <th>Branch</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={14} style={{ textAlign:'center', color:'var(--txt-3)', height:120, fontSize:12 }}>
+                    No sales found for this period
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.length===0?(
-                  <tr><td colSpan={6} style={{ padding:32, textAlign:'center', color:'var(--txt-3)' }}>No sales found</td></tr>
-                ):filtered.map(s=>(
-                  <tr key={s.id} style={{ borderBottom:'1px solid var(--border)' }}>
-                    <td style={{ padding:'10px 16px', fontSize:12, fontWeight:600, color:'var(--blue)' }}>{s.receipt_pin}</td>
-                    <td style={{ padding:'10px 16px', fontSize:12, color:'var(--txt-2)', whiteSpace:'nowrap' }}>{new Date(s.created_at).toLocaleString('en-KE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
-                    <td style={{ padding:'10px 16px', fontSize:12 }}>{Array.isArray(s.items)?s.items.filter(Boolean).length:'-'}</td>
-                    <td style={{ padding:'10px 16px' }}>
-                      <span className={`badge badge-${s.payment_method==='cash'?'green':s.payment_method==='mpesa'?'blue':s.payment_method==='card'?'purple':'gray'}`}>{s.payment_method?.replace(/_/g,' ')}</span>
-                    </td>
-                    <td style={{ padding:'10px 16px', fontSize:12, color:'var(--txt-2)' }}>{s.customer_name||'—'}</td>
-                    <td style={{ padding:'10px 16px', fontSize:13, fontWeight:700, color:'var(--txt-1)' }}>KES {Number(s.total_amount).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ) : filtered.map((s,i) => (
+                <tr key={s.id}>
+                  <td className="row-num">{i+1}</td>
+                  <td className="font-mono">{s.receipt_pin}</td>
+                  <td>{new Date(s.created_at).toLocaleDateString('en-KE')}</td>
+                  <td className="muted">{new Date(s.created_at).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</td>
+                  <td>{s.customer_name||'Walk-in'}</td>
+                  <td className="num">{s.item_count||'—'}</td>
+                  <td className="num">{Number(s.subtotal||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                  <td className="num">{Number(s.tax_amount||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                  <td className="num">{Number(s.discount_amount||0)>0?Number(s.discount_amount).toLocaleString(undefined,{minimumFractionDigits:2}):'—'}</td>
+                  <td className="num fw-700">{Number(s.total_amount||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                  <td><span className={`badge badge-${s.payment_method==='cash'?'green':s.payment_method==='mpesa'?'blue':'yellow'}`}>{s.payment_method}</span></td>
+                  <td className="truncate">{s.cashier_name||'—'}</td>
+                  <td className="muted truncate">{s.branch_name||'Main'}</td>
+                  <td><span className={`badge badge-${s.status==='completed'?'green':s.status==='returned'?'red':'gray'}`}>{s.status||'completed'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
+      </div>
+
+      {/* Status bar */}
+      <div className="xl-statusbar">
+        <span className="xl-statusbar-item">Rows: <strong>{filtered.length}</strong></span>
+        <span className="xl-statusbar-sep">|</span>
+        <span className="xl-statusbar-item">SUM(Total): <strong>KES {Math.round(total).toLocaleString()}</strong></span>
+        <span className="xl-statusbar-sep">|</span>
+        <span className="xl-statusbar-item">AVG: <strong>KES {Math.round(avgSale).toLocaleString()}</strong></span>
+        <span className="xl-statusbar-sep">|</span>
+        <span className="xl-statusbar-item">Period: <strong>{from} → {to}</strong></span>
       </div>
     </div>
   )
