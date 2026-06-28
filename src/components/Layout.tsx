@@ -7,7 +7,8 @@ import { getCurrentAuthUser, logout } from '@/lib/auth'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   LogOut, Menu, X, Store, Settings, Users, Truck,
-  FileText, TrendingUp, GitBranch, Tag, Layers, RotateCcw
+  FileText, TrendingUp, GitBranch, Tag, Layers, RotateCcw,
+  CreditCard, LifeBuoy
 } from 'lucide-react'
 
 const NAV_SECTIONS = [
@@ -39,6 +40,14 @@ const NAV_SECTIONS = [
       { name: 'Reports',   href: '/reports',   icon: TrendingUp },
       { name: 'Branches',  href: '/branches',  icon: GitBranch },
       { name: 'Settings',  href: '/settings',  icon: Settings },
+    ]
+  },
+  {
+    label: 'Account',
+    adminOnly: true,
+    items: [
+      { name: 'Billing',  href: '/billing', icon: CreditCard },
+      { name: 'Support',  href: '/support', icon: LifeBuoy },
     ]
   },
 ]
