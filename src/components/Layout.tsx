@@ -11,6 +11,8 @@ import {
   CreditCard, LifeBuoy
 } from 'lucide-react'
 
+const PUBLIC_PAGES = ['/', '/login', '/register']
+
 const NAV_SECTIONS = [
   {
     label: 'Operations',
@@ -58,39 +60,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
 
-  useEffect(() => { checkAuth() }, [pathname])
+  const isPublicPage = PUBLIC_PAGES.includes(pathname)
+
+  useEffect(() => {
+    if (!isPublicPage) checkAuth()
+  }, [pathname])
+
   useEffect(() => { setOpen(false) }, [pathname])
 
   const checkAuth = async () => {
     const u = await getCurrentAuthUser()
-    if (!u && pathname !== '/login') router.push('/login')
+    if (!u) router.push('/login')
     else setUser(u)
   }
 
   const handleLogout = async () => { await logout(); router.push('/login') }
 
-  if (pathname === '/login') return <>{children}</>
+  // Public pages render without sidebar
+  if (isPublicPage) return <>{children}</>
 
   const initials = user?.name?.split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2) || '??'
 
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--bg)' }}>
 
-      {/* Mobile overlay */}
       {open && (
         <div onClick={() => setOpen(false)} style={{
           position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:40
         }} />
       )}
 
-      {/* ── Sidebar ── */}
       <aside className="sidebar" style={{
         position: 'relative',
         zIndex: 50,
         transform: open ? 'translateX(0)' : undefined,
         transition: 'transform .2s',
       }}>
-        {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-icon">
             <Store size={16} color="var(--xl-green)" />
@@ -101,10 +106,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="sidebar-nav">
           {NAV_SECTIONS.map(section => {
-            if (section.adminOnly && user?.role !== 'admin') return null
+            if (section.adminOnly && user?.role !== 'admin' && user?.role !== 'owner') return null
             return (
               <div key={section.label}>
                 <div className="sidebar-nav-label">{section.label}</div>
@@ -124,13 +128,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer */}
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <div className="sidebar-avatar">{initials}</div>
             <div>
               <div className="sidebar-user-name">{user?.name || 'Loading…'}</div>
-              <div className="sidebar-user-role">{user?.role || ''} · {user?.tenant_name || ''}</div>
+              <div className="sidebar-user-role">{user?.role || ''}</div>
             </div>
           </div>
           <button onClick={handleLogout} className="btn btn-ghost" style={{ width:'100%', color:'rgba(255,255,255,.6)', borderColor:'rgba(255,255,255,.15)' }}>
@@ -139,9 +142,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* ── Main ── */}
       <main style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        {/* Mobile topbar */}
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 14px', background:'var(--xl-green)', borderBottom:'1px solid var(--xl-green-hover)' }}
              className="mobile-topbar">
           <button onClick={()=>setOpen(!open)} className="btn btn-ghost" style={{ color:'#fff', borderColor:'rgba(255,255,255,.2)' }}>
