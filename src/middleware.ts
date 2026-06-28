@@ -5,8 +5,13 @@ const PUBLIC_PATHS = ['/', '/login', '/register', '/api/auth/login', '/api/auth/
   '/api/billing/webhook', '/_next', '/favicon.ico', '/file.svg', '/globe.svg', '/next.svg',
   '/window.svg', '/vercel.svg']
 
+const ADMIN_PATHS = ['/admin', '/api/admin']
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // Allow admin routes — they have their own smartpos_admin cookie auth
+  if (ADMIN_PATHS.some(p => pathname.startsWith(p))) return NextResponse.next()
 
   // Allow public paths
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) return NextResponse.next()
