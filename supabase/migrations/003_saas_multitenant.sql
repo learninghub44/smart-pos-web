@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS tenants (
   country         VARCHAR(100) DEFAULT 'Kenya',
   plan_id         VARCHAR(50) REFERENCES plans(id) DEFAULT 'starter',
   trial_ends_at   TIMESTAMPTZ,                     -- NULL once converted to paid
-  status          VARCHAR(30) DEFAULT 'trial'      -- trial | active | suspended | cancelled
-    CHECK (status IN ('trial', 'active', 'suspended', 'cancelled')),
+  status          VARCHAR(30) DEFAULT 'trial'      -- pending_payment | trial | active | suspended | cancelled
+    CHECK (status IN ('pending_payment', 'trial', 'active', 'suspended', 'cancelled')),
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );

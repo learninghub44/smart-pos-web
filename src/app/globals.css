@@ -68,10 +68,13 @@ html { font-size: 13px; }
 body {
   background: var(--bg);
   color: var(--txt-1);
-  font-family: 'Segoe UI', 'Calibri', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Scrollbars (thin, Excel-style) ── */
@@ -107,9 +110,10 @@ body {
 }
 
 .xl-toolbar-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--txt-1);
+  letter-spacing: -0.01em;
   margin-right: 8px;
 }
 
@@ -238,8 +242,10 @@ body {
 .xl-grid tbody td:last-child { border-right: none; }
 .xl-grid tbody td.num {
   text-align: right;
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
+  font-feature-settings: 'tnum';
 }
 .xl-grid tbody td.muted { color: var(--txt-3); }
 
@@ -316,6 +322,8 @@ body {
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 500;
+  font-family: 'Inter', -apple-system, sans-serif;
+  letter-spacing: -0.01em;
   border: 1px solid var(--border-md);
   background: var(--surface);
   color: var(--txt-1);
@@ -370,6 +378,8 @@ body {
   background: var(--surface);
   color: var(--txt-1);
   font-size: 12px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  letter-spacing: -0.01em;
   border-radius: 2px;
   outline: none;
   font-family: inherit;
@@ -437,7 +447,7 @@ textarea.input { height: auto; padding: 6px 8px; resize: vertical; }
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
 }
-.modal-title { font-size: 13px; font-weight: 700; color: var(--txt-1); }
+.modal-title { font-size: 13px; font-weight: 600; color: var(--txt-1); letter-spacing: -0.01em; }
 .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
 .modal-footer {
   display: flex;

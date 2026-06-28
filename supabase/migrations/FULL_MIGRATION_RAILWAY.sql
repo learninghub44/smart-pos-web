@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   plan_id         VARCHAR(50) REFERENCES plans(id) DEFAULT 'starter',
   trial_ends_at   TIMESTAMPTZ,
   status          VARCHAR(30) DEFAULT 'trial'
-    CHECK (status IN ('trial', 'active', 'suspended', 'cancelled')),
+    CHECK (status IN ('pending_payment', 'trial', 'active', 'suspended', 'cancelled')),
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
