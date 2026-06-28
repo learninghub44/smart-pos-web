@@ -9,20 +9,20 @@ function SuccessContent() {
 
   useEffect(() => {
     const ref = params.get('ref') || params.get('reference')
-    if (ref) {
-      fetch(`/api/billing/verify?ref=${ref}`).catch(() => {})
-    }
+    if (ref) fetch(`/api/billing/verify?ref=${ref}`).catch(() => {})
     const t = setTimeout(() => router.push('/dashboard'), 4000)
     return () => clearTimeout(t)
   }, [])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', color: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <CheckCircle size={64} color="#10b981" style={{ margin: '0 auto 1.5rem' }} />
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.75rem' }}>Payment Successful!</h1>
-        <p style={{ color: '#94a3b8', marginBottom: '2rem' }}>Your subscription is now active. Redirecting to your dashboard…</p>
-        <div style={{ width: 48, height: 48, border: '3px solid #1e293b', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400, padding: 40 }}>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '40px 48px', textAlign: 'center', maxWidth: 420 }}>
+        <CheckCircle size={48} color="var(--green)" style={{ margin: '0 auto 16px' }} />
+        <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--txt-1)', margin: '0 0 10px' }}>Payment Successful!</h1>
+        <p style={{ fontSize: 13, color: 'var(--txt-2)', marginBottom: 24, lineHeight: 1.6 }}>
+          Your account is now active. Redirecting you to the dashboard…
+        </p>
+        <div style={{ width: 28, height: 28, border: '3px solid var(--border)', borderTop: `3px solid var(--xl-green)`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     </div>
