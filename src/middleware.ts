@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/api/auth/login', '/api/auth/register',
-  '/api/billing/webhook', '/_next', '/favicon.ico', '/file.svg', '/globe.svg', '/next.svg',
+  '/api/billing/webhook', '/api/health', '/_next', '/favicon.ico', '/file.svg', '/globe.svg', '/next.svg',
   '/window.svg', '/vercel.svg']
 
 const ADMIN_PATHS = ['/admin', '/api/admin']
