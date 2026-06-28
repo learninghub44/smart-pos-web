@@ -250,11 +250,11 @@ export default function LoginPage() {
           }}
             onMouseEnter={e => { e.currentTarget.style.background = '#e8891a'; e.currentTarget.style.color = '#fff' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#e8891a' }}>
-            Start 14-Day Free Trial
+            Get Started Today
           </Link>
 
           <p style={{ textAlign: 'center', fontSize: 12.5, color: '#a0aec0', marginTop: 24, lineHeight: 1.6 }}>
-            14-day free trial · No credit card needed · Setup in minutes
+            Pay once, get started instantly · Setup in minutes
           </p>
         </div>
       </div>

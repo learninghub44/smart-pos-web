@@ -52,7 +52,7 @@ function RegisterForm() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Registration failed'); setLoading(false); return }
-      // Always redirect to billing — trial starts only after first payment
+      // Redirect to billing to complete payment
       router.push('/billing?onboarding=1')
     } catch {
       setError('Network error. Please try again.'); setLoading(false)
@@ -105,7 +105,7 @@ function RegisterForm() {
               Choose Your Plan
             </div>
             <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 900, fontSize: 28, color: '#fff', lineHeight: 1.12, letterSpacing: '-0.02em' }}>
-              Start with a<br /><span style={{ color: '#e8891a' }}>14-day free trial</span>
+              Start your<br /><span style={{ color: '#e8891a' }}>POS journey today</span>
             </h2>
           </div>
 
@@ -173,7 +173,7 @@ function RegisterForm() {
           <div style={{ marginBottom: 28 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff8f0', border: '1px solid #fde0b8', borderRadius: 20, padding: '4px 12px', marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, color: '#e8891a', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                {selectedPlan.name} Plan · 14-day Free Trial
+                {selectedPlan.name} Plan
               </span>
             </div>
             <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 900, fontSize: 32, color: '#1a3a6b', letterSpacing: '-0.025em', marginBottom: 6 }}>Create Your Account</h1>

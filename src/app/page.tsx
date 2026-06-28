@@ -272,7 +272,7 @@ export default function Landing() {
 
               <div className="hero-badges" style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 {[
-                  { icon: CheckCircle, label: '14-day free trial' },
+                  { icon: CheckCircle, label: 'Pay and start instantly' },
                   { icon: Shield, label: 'No card needed' },
                   { icon: Zap, label: 'Setup in minutes' },
                 ].map(({ icon: Icon, label }) => (
@@ -476,7 +476,7 @@ export default function Landing() {
             <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 'clamp(26px, 3.5vw, 40px)', color: '#1a3a6b', marginBottom: 12, letterSpacing: '-0.02em' }}>
               Affordable Plans for Every Business
             </h2>
-            <p style={{ fontSize: 15, color: '#6b7a99', maxWidth: 400, margin: '0 auto' }}>14-day free trial on all plans. No credit card required.</p>
+            <p style={{ fontSize: 15, color: '#6b7a99', maxWidth: 400, margin: '0 auto' }}>Affordable monthly plans. M-Pesa accepted.</p>
           </div>
           <div className="plans-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, maxWidth: 980, margin: '0 auto' }}>
             {PLANS.map(plan => (
@@ -529,7 +529,7 @@ export default function Landing() {
             Ready to Modernise<br />Your Business?
           </h2>
           <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.85)', marginBottom: 40, lineHeight: 1.7 }}>
-            Join 500+ Kenyan businesses already using Smart POS. 14 days free, no card needed.
+            Join 500+ Kenyan businesses already using Smart POS. Pay and get started today.
           </p>
           <div className="cta-flex" style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => router.push('/register')} style={{ padding: '15px 34px', background: '#fff', color: '#e8891a', border: 'none', borderRadius: 6, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.01em', transition: 'transform 0.15s, box-shadow 0.15s' }}

@@ -42,26 +42,11 @@ export async function POST(req: NextRequest) {
           WHERE tenant_id = $2 AND status IN ('active','past_due')
         `, [periodEnd.toISOString(), tenantId])
 
-        // If this is the tenant's FIRST payment (they were pending_payment),
-        // activate their 14-day trial now. Otherwise just set them to 'active'.
-        const tenant = await queryOne<any>(
-          `SELECT status FROM tenants WHERE id = $1`, [tenantId]
+        // First payment or renewal — always set active immediately
+        await query(
+          `UPDATE tenants SET status = 'active', trial_ends_at = NULL, updated_at = NOW() WHERE id = $1`,
+          [tenantId]
         )
-        if (tenant?.status === 'pending_payment') {
-          // First payment — start the 14-day trial clock
-          const trialEndsAt = new Date()
-          trialEndsAt.setDate(trialEndsAt.getDate() + 14)
-          await query(
-            `UPDATE tenants SET status = 'trial', trial_ends_at = $1, updated_at = NOW() WHERE id = $2`,
-            [trialEndsAt.toISOString(), tenantId]
-          )
-        } else {
-          // Renewal payment — ensure tenant stays active
-          await query(
-            `UPDATE tenants SET status = 'active', updated_at = NOW() WHERE id = $1`,
-            [tenantId]
-          )
-        }
         break
       }
 

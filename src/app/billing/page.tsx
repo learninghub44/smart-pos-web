@@ -2,11 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CreditCard, Check, Zap, Star, AlertCircle, Clock, TrendingUp, Shield, ChevronRight } from 'lucide-react'
+import { CreditCard, Check, Star, AlertCircle, TrendingUp, Shield, ChevronRight, Zap } from 'lucide-react'
 
 const PLANS = [
-  { id: 'starter',    name: 'Starter',    monthly: 250,   color: 'var(--blue)',   colorLt: 'var(--blue-lt)',   features: ['1 Branch', '3 Users', '500 Products', 'Basic Reports'] },
-  { id: 'business',   name: 'Business',   monthly: 999,   color: 'var(--purple)', colorLt: 'var(--purple-lt)', popular: true, features: ['5 Branches', '15 Users', '5,000 Products', 'Advanced Analytics', 'Barcode Scanning'] },
+  { id: 'starter',    name: 'Starter',    monthly: 250,   color: 'var(--blue)',     colorLt: 'var(--blue-lt)',   features: ['1 Branch', '3 Users', '500 Products', 'Basic Reports'] },
+  { id: 'business',   name: 'Business',   monthly: 999,   color: 'var(--purple)',   colorLt: 'var(--purple-lt)', popular: true, features: ['5 Branches', '15 Users', '5,000 Products', 'Advanced Analytics', 'Barcode Scanning'] },
   { id: 'enterprise', name: 'Enterprise', monthly: 2000,  color: 'var(--xl-green)', colorLt: 'var(--xl-green-lt)', features: ['Unlimited Branches', 'Unlimited Users', 'Unlimited Products', 'API Access', 'White-label'] },
   { id: 'lifetime',   name: 'Lifetime',   monthly: null, lifetime: 16000, color: 'var(--orange)', colorLt: 'var(--orange-lt)', features: ['Business features', 'One-time payment', 'Lifetime updates', 'No monthly fees'] },
 ]
@@ -14,7 +14,6 @@ const PLANS = [
 interface TenantInfo {
   plan_id: string
   status: string
-  trial_ends_at: string | null
   business_name: string
 }
 
@@ -27,23 +26,21 @@ function BillingPageInner() {
   const router       = useRouter()
   const params       = useSearchParams()
   const isOnboarding = params.get('onboarding') === '1'
-  const [tenant, setTenant]           = useState<TenantInfo | null>(null)
+  const [tenant, setTenant]             = useState<TenantInfo | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
-  const [selectedPlan, setSelectedPlan] = useState<string>('business')
-  const [billing, setBilling]         = useState<'monthly' | 'lifetime'>('monthly')
-  const [loading, setLoading]         = useState<string | null>(null)
-  const [invoices, setInvoices]       = useState<any[]>([])
-  const [pageLoading, setPageLoading] = useState(true)
+  const [billing, setBilling]           = useState<'monthly' | 'lifetime'>('monthly')
+  const [loading, setLoading]           = useState<string | null>(null)
+  const [invoices, setInvoices]         = useState<any[]>([])
+  const [pageLoading, setPageLoading]   = useState(true)
 
   useEffect(() => {
     fetch('/api/tenant/plan').then(r => {
       if (r.status === 401) { router.push('/login'); return null }
       return r.json()
     }).then(d => {
-      if (d?.tenant?.plan_id) {
+      if (d?.tenant) {
         setTenant(d.tenant)
         setSubscription(d.subscription || null)
-        setSelectedPlan(d.tenant.plan_id)
       }
       setPageLoading(false)
     }).catch(() => setPageLoading(false))
@@ -71,25 +68,20 @@ function BillingPageInner() {
     }
   }
 
-  const trialDaysLeft = tenant?.trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(tenant.trial_ends_at).getTime() - Date.now()) / 86400000))
-    : 0
-
   const currentPlan = PLANS.find(p => p.id === tenant?.plan_id)
 
   const statusLabel = () => {
     if (!tenant) return ''
     if (tenant.status === 'pending_payment') return 'Payment Required'
-    if (tenant.status === 'trial') return `Trial — ${trialDaysLeft}d left`
     if (tenant.status === 'active') return 'Active'
     if (tenant.status === 'suspended') return 'Suspended'
-    return 'Expired'
+    if (tenant.status === 'cancelled') return 'Cancelled'
+    return tenant.status
   }
 
   const statusColor = () => {
     if (!tenant) return 'var(--txt-3)'
     if (tenant.status === 'active') return 'var(--green)'
-    if (tenant.status === 'trial') return 'var(--blue)'
     return 'var(--red)'
   }
 
@@ -117,10 +109,10 @@ function BillingPageInner() {
           <Zap size={16} color="var(--xl-green)" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--xl-green)', marginBottom: 2 }}>
-              Welcome! Complete payment to activate your 14-day free trial
+              Welcome! Complete payment to activate your account
             </div>
             <div style={{ fontSize: 12, color: 'var(--txt-2)', lineHeight: 1.5 }}>
-              Choose a plan below and pay via M-Pesa or card. Your trial starts immediately after payment — no charge for 14 days.
+              Choose a plan below and pay via M-Pesa or card. Your account unlocks immediately after payment.
             </div>
           </div>
         </div>
@@ -128,7 +120,6 @@ function BillingPageInner() {
 
       {/* ── Status cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-        {/* Current Plan */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '12px 14px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--txt-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Current Plan</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--txt-1)', marginBottom: 2 }}>{currentPlan?.name || '—'}</div>
@@ -136,18 +127,15 @@ function BillingPageInner() {
             {currentPlan?.monthly ? `KES ${currentPlan.monthly.toLocaleString()}/mo` : 'Lifetime'}
           </div>
         </div>
-        {/* Status */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '12px 14px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--txt-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Status</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: statusColor(), marginBottom: 2 }}>{statusLabel()}</div>
           <div style={{ fontSize: 11, color: 'var(--txt-3)' }}>
             {tenant?.status === 'pending_payment' ? 'Pay below to activate' :
-             tenant?.status === 'trial' && tenant?.trial_ends_at ? `Expires ${new Date(tenant.trial_ends_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}` :
              subscription?.current_period_end ? `Renews ${new Date(subscription.current_period_end).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}` :
              'Subscribe to continue'}
           </div>
         </div>
-        {/* Payments */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '12px 14px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--txt-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Total Paid</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--txt-1)', marginBottom: 2 }}>
@@ -163,16 +151,7 @@ function BillingPageInner() {
           <AlertCircle size={15} color="var(--yellow)" />
           <div>
             <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--yellow)' }}>Payment required — </span>
-            <span style={{ fontSize: 12, color: 'var(--txt-2)' }}>Your 14-day free trial hasn&apos;t started yet. Choose a plan and pay below to activate it.</span>
-          </div>
-        </div>
-      )}
-      {tenant?.status === 'trial' && (
-        <div style={{ background: 'var(--blue-lt)', border: '1px solid var(--blue)', borderRadius: 2, padding: '10px 14px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Clock size={15} color="var(--blue)" />
-          <div>
-            <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--blue)' }}>Free trial active — {trialDaysLeft} days left. </span>
-            <span style={{ fontSize: 12, color: 'var(--txt-2)' }}>Subscribe below before your trial ends to keep uninterrupted access.</span>
+            <span style={{ fontSize: 12, color: 'var(--txt-2)' }}>Your account is not yet active. Choose a plan and complete payment below to get started.</span>
           </div>
         </div>
       )}
@@ -188,11 +167,9 @@ function BillingPageInner() {
 
       {/* ── Plan selector ── */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', marginBottom: 20 }}>
-        {/* Section toolbar */}
         <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-2)' }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-1)' }}>Choose a Plan</span>
-          {/* Billing toggle */}
-          <div style={{ display: 'flex', gap: 0, border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', overflow: 'hidden' }}>
             {(['monthly', 'lifetime'] as const).map(t => (
               <button key={t} onClick={() => setBilling(t)} style={{
                 padding: '4px 12px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
@@ -206,20 +183,17 @@ function BillingPageInner() {
           </div>
         </div>
 
-        {/* Plans grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', padding: 14 } as React.CSSProperties}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', padding: 14 }}>
           {PLANS.filter(p => billing === 'lifetime' ? p.id === 'lifetime' : p.id !== 'lifetime').map(plan => {
-            const isCurrent = tenant?.plan_id === plan.id
+            const isCurrent = tenant?.plan_id === plan.id && tenant?.status === 'active'
             return (
               <div key={plan.id} style={{
                 border: `2px solid ${isCurrent ? plan.color : 'var(--border)'}`,
-                padding: 16,
-                position: 'relative',
+                padding: 16, position: 'relative',
                 background: isCurrent ? plan.colorLt : 'var(--surface)',
-                cursor: isCurrent ? 'default' : 'pointer',
               }}>
                 {(plan as any).popular && (
-                  <div style={{ position: 'absolute', top: -1, right: 10, background: 'var(--purple)', color: 'white', padding: '1px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>
+                  <div style={{ position: 'absolute', top: -1, right: 10, background: 'var(--purple)', color: 'white', padding: '1px 8px', fontSize: 10, fontWeight: 700 }}>
                     POPULAR
                   </div>
                 )}
@@ -286,7 +260,7 @@ function BillingPageInner() {
                   <td style={{ padding: '7px 14px', fontWeight: 600 }}>KES {Number(inv.amount).toLocaleString()}</td>
                   <td style={{ padding: '7px 14px', color: 'var(--txt-3)', fontFamily: 'monospace', fontSize: 11 }}>{inv.paystack_ref}</td>
                   <td style={{ padding: '7px 14px' }}>
-                    <span style={{ padding: '2px 7px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', background: inv.status === 'paid' ? 'var(--green-lt)' : 'var(--yellow-lt)', color: inv.status === 'paid' ? 'var(--green)' : 'var(--yellow)' }}>
+                    <span style={{ padding: '2px 7px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', background: inv.status === 'paid' ? 'var(--green-lt)' : 'var(--yellow-lt)', color: inv.status === 'paid' ? 'var(--green)' : 'var(--yellow)' }}>
                       {inv.status}
                     </span>
                   </td>
@@ -297,7 +271,7 @@ function BillingPageInner() {
         </div>
       )}
 
-      {/* ── Support footer ── */}
+      {/* ── Footer ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Shield size={13} color="var(--txt-3)" />

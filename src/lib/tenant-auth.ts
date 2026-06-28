@@ -122,8 +122,8 @@ export function isTenantActive(tenant: { status: string; trial_ends_at: string |
   if (tenant.status === 'active') return true
   if (tenant.status === 'pending_payment') return false  // must pay first
   if (tenant.status === 'trial') {
-    if (!tenant.trial_ends_at) return true  // trial started, no end date set yet
-    return new Date(tenant.trial_ends_at) > new Date()
+    // Legacy: treat trial as active
+    return true
   }
   return false
 }
