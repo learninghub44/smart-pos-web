@@ -207,7 +207,7 @@ function BillingPageInner() {
         </div>
 
         {/* Plans grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 0, padding: 14, gap: '12px' } as React.CSSProperties}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', padding: 14 } as React.CSSProperties}>
           {PLANS.filter(p => billing === 'lifetime' ? p.id === 'lifetime' : p.id !== 'lifetime').map(plan => {
             const isCurrent = tenant?.plan_id === plan.id
             return (
