@@ -57,6 +57,7 @@ const NAV_SECTIONS = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [user, setUser]   = useState<any>(null)
   const [open, setOpen]   = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const pathname = usePathname()
   const router   = useRouter()
 
@@ -71,7 +72,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     const u = await getCurrentAuthUser()
     if (!u) router.push('/login')
-    else setUser(u)
+    else {
+      setUser(u)
+      // Load tenant logo
+      fetch('/api/tenant/logo').then(r => r.json()).then(d => { if (d.logo_url) setLogoUrl(d.logo_url) }).catch(() => {})
+    }
   }
 
   const handleLogout = async () => { await logout(); router.push('/login') }
@@ -97,8 +102,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         transition: 'transform .2s',
       }}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">
-            <Store size={16} color="var(--xl-green)" />
+          <div className="sidebar-brand-icon" style={{ overflow: 'hidden', padding: logoUrl ? 0 : undefined }}>
+            {logoUrl
+              ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} />
+              : <Store size={16} color="var(--xl-green)" />
+            }
           </div>
           <div>
             <div className="sidebar-brand-name">Smart POS</div>

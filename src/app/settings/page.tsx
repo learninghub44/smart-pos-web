@@ -1,13 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings, CreditCard, Pencil, Trash2 } from 'lucide-react'
+import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings, CreditCard, Pencil, Trash2, Upload, Trash } from 'lucide-react'
 import { getCurrentAuthUser, isOwner, isAdmin } from '@/lib/auth'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'business' | 'receipt' | 'tax' | 'payment' | 'staff' | 'system'>('business')
   const [saving, setSaving] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoSaving, setLogoSaving] = useState(false)
+  const [logoError, setLogoError] = useState('')
   
   const [businessSettings, setBusinessSettings] = useState({
     name: 'SMART POS',
@@ -48,6 +51,8 @@ export default function SettingsPage() {
     loadUser()
     loadSettings()
     loadStaff()
+    // Load current logo
+    fetch('/api/tenant/logo').then(r => r.json()).then(d => { if (d.logo_url) setLogoUrl(d.logo_url) }).catch(() => {})
   }, [])
 
   const loadUser = () => {
@@ -271,6 +276,38 @@ export default function SettingsPage() {
     { id: 'system' as const, label: 'System', icon: Settings }
   ]
 
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setLogoError('Please select an image file'); return }
+    if (file.size > 400_000) { setLogoError('Image must be under 400 KB'); return }
+    setLogoError('')
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const dataUrl = reader.result as string
+      setLogoSaving(true)
+      try {
+        const res = await fetch('/api/tenant/logo', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ logo_url: dataUrl }) })
+        const data = await res.json()
+        if (res.ok) setLogoUrl(dataUrl)
+        else setLogoError(data.error || 'Upload failed')
+      } catch { setLogoError('Network error') }
+      setLogoSaving(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleLogoRemove = async () => {
+    if (!confirm('Remove logo? The system icon will be shown instead.')) return
+    setLogoSaving(true)
+    try {
+      const res = await fetch('/api/tenant/logo', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ logo_url: null }) })
+      if (res.ok) setLogoUrl(null)
+      else setLogoError('Failed to remove logo')
+    } catch { setLogoError('Network error') }
+    setLogoSaving(false)
+  }
+
   return (
     <div className="xl-page">
       {/* Ribbon tabs */}
@@ -292,7 +329,43 @@ export default function SettingsPage() {
           {activeTab === 'business' && (
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <h2 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)",marginBottom:12}}>Business Settings</h2>
-              
+
+              {/* ── LOGO UPLOAD ── */}
+              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px 24px', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt-2)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>Business Logo</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                  {/* Preview */}
+                  <div style={{ width: 80, height: 80, borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                    {logoUrl
+                      ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+                      : <Settings size={28} color="var(--txt-3)" strokeWidth={1.5} />
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontSize: 13, color: 'var(--txt-1)', fontWeight: 600, marginBottom: 6 }}>
+                      {logoUrl ? 'Logo uploaded' : 'No logo set'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--txt-3)', marginBottom: 14, lineHeight: 1.5 }}>
+                      PNG or SVG recommended. Max 400 KB. Shows in the sidebar and on receipts.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'var(--accent)', color: '#fff', borderRadius: 7, cursor: logoSaving ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, opacity: logoSaving ? 0.6 : 1 }}>
+                        <Upload size={13} strokeWidth={2.5} />
+                        {logoSaving ? 'Saving…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+                        <input type="file" accept="image/*" onChange={handleLogoFile} style={{ display: 'none' }} disabled={logoSaving} />
+                      </label>
+                      {logoUrl && (
+                        <button onClick={handleLogoRemove} disabled={logoSaving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', borderRadius: 7, cursor: logoSaving ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600 }}>
+                          <Trash size={13} strokeWidth={2} />
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {logoError && <div style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>{logoError}</div>}
+                  </div>
+                </div>
+              </div>
+
               <div className="form-row">
                 <div>
                   <label className="form-label">
