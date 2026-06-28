@@ -668,7 +668,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Add Staff Modal */}
       {showStaffModal && (
         <div className="modal-overlay">
           <div className="modal" style={{maxWidth:400}}>
