@@ -6,7 +6,7 @@ import { login, getRememberedBrand } from '@/lib/auth'
 import {
   Eye, EyeOff, ArrowRight,
   Smartphone, GitBranch, CreditCard, Printer,
-  Star, AlertCircle
+  AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -122,10 +122,6 @@ export default function LoginPage() {
 
         {/* Rating footer */}
         <div style={{ position: 'relative', zIndex: 1, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 24 }}>
-          <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
-            {[...Array(5)].map((_, i) => <Star key={i} size={14} color="#e8891a" fill="#e8891a" />)}
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginLeft: 8, fontWeight: 500 }}>500+ verified clients</span>
-          </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: 1.6 }}>
             "Reliable, affordable and very easy to use. Highly recommended for Kenyan businesses."
           </p>

@@ -16,12 +16,17 @@ interface TenantInfo {
   status: string
   trial_ends_at: string | null
   business_name: string
-  subscription_end?: string | null
+}
+
+interface SubscriptionInfo {
+  current_period_end: string | null
+  status: string
 }
 
 export default function BillingPage() {
   const router = useRouter()
   const [tenant, setTenant] = useState<TenantInfo | null>(null)
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string>('business')
   const [billing, setBilling] = useState<'monthly' | 'lifetime'>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
@@ -29,9 +34,15 @@ export default function BillingPage() {
   const [pageLoading, setPageLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/tenant/plan').then(r => r.json()).then(d => {
-      if (d.plan_id) { setTenant(d); setSelectedPlan(d.plan_id) }
-      else router.push('/login')
+    fetch('/api/tenant/plan').then(r => {
+      if (r.status === 401) { router.push('/login'); return null }
+      return r.json()
+    }).then(d => {
+      if (d?.tenant?.plan_id) {
+        setTenant(d.tenant)
+        setSubscription(d.subscription || null)
+        setSelectedPlan(d.tenant.plan_id)
+      }
       setPageLoading(false)
     }).catch(() => setPageLoading(false))
     fetch('/api/billing/invoices').then(r => r.json()).then(d => d.invoices && setInvoices(d.invoices)).catch(() => {})
@@ -136,7 +147,7 @@ export default function BillingPage() {
             </div>
             <div style={s.statSub}>
               {tenant?.status === 'trial' ? `${trialDaysLeft} days remaining` :
-               tenant?.subscription_end ? `Renews ${new Date(tenant.subscription_end).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' })}` :
+               subscription?.current_period_end ? `Renews ${new Date(subscription.current_period_end).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' })}` :
                'Subscribe to continue access'}
             </div>
           </div>

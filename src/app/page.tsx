@@ -594,10 +594,6 @@ export default function Landing() {
             <p style={{ fontSize: 13.5, color: '#6b8ab0', lineHeight: 1.75, maxWidth: 280 }}>
               Affordable, reliable and easy to use POS system built for Kenyan businesses. Works on any device, even offline.
             </p>
-            <div style={{ display: 'flex', gap: 3, marginTop: 16 }}>
-              {[...Array(5)].map((_, i) => <Star key={i} size={13} color="#e8891a" fill="#e8891a" />)}
-              <span style={{ fontSize: 12, color: '#4a6a99', marginLeft: 6 }}>500+ Verified Clients</span>
-            </div>
           </div>
           <div>
             <div style={{ fontSize: 10, fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, color: '#3a5a8a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Product</div>
