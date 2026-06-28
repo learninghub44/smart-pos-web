@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { login } from '@/lib/auth'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -27,102 +27,117 @@ export default function LoginPage() {
     setLoading(false)
   }
 
-  const inputStyle = { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'#f1f5f9', caretColor:'#3b82f6' }
-  const inputFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border='1px solid #3b82f6'; e.target.style.background='rgba(59,130,246,0.07)' }
-  const inputBlur  = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border='1px solid rgba(255,255,255,0.1)'; e.target.style.background='rgba(255,255,255,0.05)' }
+  const inputStyle = { background: '#FFFCF6', border: '1px solid #E4DCC8', color: '#1B2A41', caretColor: '#C97F1E' }
+  const inputFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid #C97F1E'; e.target.style.boxShadow = '0 0 0 3px rgba(201,127,30,0.12)' }
+  const inputBlur = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.border = '1px solid #E4DCC8'; e.target.style.boxShadow = 'none' }
 
   return (
-    <div className="min-h-screen flex" style={{ background:'#0f172a' }}>
-      <div className="hidden lg:flex flex-col justify-between w-1/2 p-12"
-        style={{ background:'linear-gradient(135deg,#1e3a5f 0%,#0f172a 60%)', borderRight:'1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background:'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
-            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth="2">
-              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+    <div className="min-h-screen flex" style={{ background: '#FBF7EF', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&display=swap');
+      `}</style>
+
+      {/* ── Editorial side panel ── */}
+      <div className="hidden lg:flex flex-col justify-between w-1/2 p-14" style={{ background: '#16243F', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -120, right: -120, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(232,162,61,0.18), transparent 70%)' }} />
+
+        <div className="flex items-center gap-3" style={{ zIndex: 1 }}>
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: '#E8A23D' }}>
+            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="#16243F" strokeWidth="2.2">
+              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />
             </svg>
           </div>
           <div>
-            <div className="text-white font-bold text-base leading-tight">Smart POS</div>
-            <div className="text-xs font-medium" style={{ color:'#60a5fa' }}>by Zetu Business Solutions</div>
+            <div className="text-white font-bold text-base leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>Smart POS</div>
+            <div className="text-xs font-medium" style={{ color: '#E8A23D' }}>by Zetu Business Solutions</div>
           </div>
         </div>
-        <div>
+
+        <div style={{ zIndex: 1 }}>
           <div className="inline-block text-xs font-semibold tracking-widest uppercase mb-6 px-3 py-1 rounded-full"
-            style={{ background:'rgba(59,130,246,0.15)', color:'#60a5fa' }}>Point of Sale System</div>
-          <h2 className="text-5xl font-bold leading-tight mb-6" style={{ color:'#f8fafc', letterSpacing:'-0.02em' }}>
+            style={{ background: 'rgba(232,162,61,0.15)', color: '#E8A23D' }}>Point of Sale, Issue No. 01</div>
+          <h2 className="leading-tight mb-6" style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: '3.1rem', color: '#FBF7EF', letterSpacing: '-0.01em' }}>
             Sell smarter.<br />Track everything.
           </h2>
-          <p style={{ color:'#94a3b8', fontSize:'1.05rem', lineHeight:'1.7' }}>
-            Inventory, sales, receipts, and reports — all in one place.
+          <p style={{ color: '#AEB9CC', fontSize: '1.05rem', lineHeight: '1.7', maxWidth: 380 }}>
+            Inventory, sales, receipts and reports — all in one place, on any screen you&apos;ve got.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          {[{label:'M-Pesa Ready',icon:'📱'},{label:'Multi-Branch',icon:'🏪'},{label:'Thermal Print',icon:'🖨️'}].map(item=>(
-            <div key={item.label} className="rounded-xl p-4" style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
+
+        <div className="grid grid-cols-3 gap-4" style={{ zIndex: 1 }}>
+          {[{ label: 'Works on Phone', icon: '📱' }, { label: 'Multi-Branch', icon: '🏪' }, { label: 'Thermal Print', icon: '🖨️' }].map(item => (
+            <div key={item.label} className="rounded-lg p-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <div className="text-xl mb-1">{item.icon}</div>
-              <div className="text-xs font-medium" style={{ color:'#64748b' }}>{item.label}</div>
+              <div className="text-xs font-medium" style={{ color: '#8C97AD' }}>{item.label}</div>
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor:'rgba(255,255,255,0.06)' }}>
-          <span className="text-xs" style={{ color:'#334155' }}>Powered by</span>
-          <span className="text-xs font-semibold" style={{ color:'#475569' }}>Zetu Business Solutions</span>
+
+        <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)', zIndex: 1 }}>
+          <span className="text-xs" style={{ color: '#5B677F' }}>Powered by</span>
+          <span className="text-xs font-semibold" style={{ color: '#8C97AD' }}>Zetu Business Solutions</span>
         </div>
       </div>
 
+      {/* ── Form side ── */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-3 mb-10 lg:hidden">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background:'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}>
-              <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-white" stroke="currentColor" strokeWidth="2">
-                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#E8A23D' }}>
+              <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="#16243F" strokeWidth="2.2">
+                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />
               </svg>
             </div>
             <div>
-              <div className="text-white font-bold text-base leading-tight">Smart POS</div>
-              <div className="text-xs" style={{ color:'#60a5fa' }}>by Zetu Business Solutions</div>
+              <div className="font-bold text-base leading-tight" style={{ color: '#16243F' }}>Smart POS</div>
+              <div className="text-xs" style={{ color: '#C97F1E' }}>by Zetu Business Solutions</div>
             </div>
           </div>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2" style={{ color:'#f1f5f9', letterSpacing:'-0.02em' }}>Welcome back</h1>
-            <p style={{ color:'#64748b' }}>Sign in to your account to continue</p>
+            <div className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#C97F1E' }}>Welcome back</div>
+            <h1 className="mb-2" style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: '2.3rem', color: '#16243F', letterSpacing: '-0.01em' }}>Sign in</h1>
+            <p style={{ color: '#7A7164' }}>Pick up right where your shop left off.</p>
           </div>
 
           {error && (
-            <div className="flex items-start gap-3 px-4 py-3 rounded-xl mb-6 text-sm"
-              style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#fca5a5' }}>
+            <div className="flex items-start gap-3 px-4 py-3 rounded-lg mb-6 text-sm"
+              style={{ background: '#FDEFEC', border: '1px solid #F3C7BC', color: '#B23A2E' }}>
               <span className="mt-0.5">⚠</span><span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color:'#94a3b8' }}>Email address</label>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all" style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}/>
+              <label className="block text-sm font-medium mb-2" style={{ color: '#5B5346' }}>Email address</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required
+                className="w-full px-4 py-3 rounded-lg text-sm outline-none transition-all" style={inputStyle} onFocus={inputFocus} onBlur={inputBlur} />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color:'#94a3b8' }}>Password</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: '#5B5346' }}>Password</label>
               <div className="relative">
-                <input type={showPassword?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}
-                  placeholder="Enter your password" required className="w-full px-4 py-3 pr-12 rounded-xl text-sm outline-none transition-all"
-                  style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}/>
-                <button type="button" onClick={()=>setShowPassword(!showPassword)} tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded" style={{ color:'#475569' }}>
-                  {showPassword?<EyeOff className="w-4 h-4"/>:<Eye className="w-4 h-4"/>}
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Enter your password" required className="w-full px-4 py-3 pr-12 rounded-lg text-sm outline-none transition-all"
+                  style={inputStyle} onFocus={inputFocus} onBlur={inputBlur} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded" style={{ color: '#A89B82' }}>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
-            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl text-sm font-semibold transition-all mt-2"
-              style={{ background:loading?'#1e40af':'#3b82f6', color:'#fff', opacity:loading?0.7:1, cursor:loading?'not-allowed':'pointer' }}>
-              {loading ? <span className="flex items-center justify-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Signing in…</span> : 'Sign in'}
+            <button type="submit" disabled={loading} className="w-full py-3 rounded-lg text-sm font-semibold transition-all mt-2 flex items-center justify-center gap-2"
+              style={{ background: loading ? '#D9A24A' : '#E8A23D', color: '#16243F', opacity: loading ? 0.8 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
+              {loading ? (
+                <span className="flex items-center justify-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>Signing in…</span>
+              ) : (
+                <>Sign in <ArrowRight className="w-4 h-4" /></>
+              )}
             </button>
           </form>
 
-          <p className="text-center text-xs mt-8" style={{ color:'#475569' }}>
+          <p className="text-center text-xs mt-8" style={{ color: '#A89B82' }}>
             Don&apos;t have an account?{' '}
-            <Link href="/register" style={{ color:'#60a5fa' }}>Start free trial</Link>
+            <Link href="/register" style={{ color: '#C97F1E', fontWeight: 600 }}>Start free trial</Link>
           </p>
         </div>
       </div>
