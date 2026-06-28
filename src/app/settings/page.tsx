@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings, CreditCard, Pencil, Trash2 } from 'lucide-react'
-import { getCurrentAuthUser, isOwner, isAdmin, register } from '@/lib/auth'
+import { getCurrentAuthUser, isOwner, isAdmin } from '@/lib/auth'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
