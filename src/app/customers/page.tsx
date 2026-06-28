@@ -1,107 +1,163 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Search, Plus, Edit, Trash2, Users } from 'lucide-react'
+import { Search, Plus, Edit, Trash2, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 const EMPTY = { name:'', phone:'', email:'', credit_limit:'0' }
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [loading, setLoading]     = useState(true)
+  const [search, setSearch]       = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-  const [form, setForm] = useState(EMPTY)
-  const [saving, setSaving] = useState(false)
+  const [editing, setEditing]     = useState<any>(null)
+  const [form, setForm]           = useState(EMPTY)
+  const [saving, setSaving]       = useState(false)
 
-  useEffect(()=>{ load() },[])
+  useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    try { const r=await fetch('/api/customers'); if(r.ok) setCustomers(await r.json()) } catch {}
+    try { const r = await fetch('/api/customers'); if (r.ok) setCustomers(await r.json()) } catch {}
     setLoading(false)
   }
 
-  function openNew() { setEditing(null); setForm(EMPTY); setShowModal(true) }
-  function openEdit(c: any) { setEditing(c); setForm({ name:c.name, phone:c.phone||'', email:c.email||'', credit_limit:c.credit_limit||'0' }); setShowModal(true) }
+  function openNew()    { setEditing(null); setForm(EMPTY); setShowModal(true) }
+  function openEdit(c:any) { setEditing(c); setForm({ name:c.name, phone:c.phone||'', email:c.email||'', credit_limit:String(c.credit_limit||0) }); setShowModal(true) }
 
   async function save() {
     setSaving(true)
     try {
       const body = { ...form, credit_limit:parseFloat(form.credit_limit)||0, ...(editing?{id:editing.id}:{}) }
-      const r = await fetch('/api/customers',{ method:editing?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
-      if(r.ok){ setShowModal(false); load() }
+      const r = await fetch('/api/customers', { method:editing?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+      if (r.ok) { setShowModal(false); load() }
     } catch {}
     setSaving(false)
   }
 
-  async function del(id: string) {
-    if(!confirm('Delete this customer?')) return
-    await fetch('/api/customers',{ method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) })
+  async function del(id:string) {
+    if (!confirm('Delete this customer?')) return
+    await fetch('/api/customers', { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id}) })
     load()
   }
 
-  const filtered = customers.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.phone||'').includes(search))
+  function exportXlsx() {
+    const rows = filtered.map((c,i) => ({
+      '#': i+1, Name:c.name, Phone:c.phone||'', Email:c.email||'',
+      'Credit Limit (KES)': Number(c.credit_limit||0),
+      'Total Spent (KES)':  Number(c.total_spent||0),
+      'Since': new Date(c.created_at).toLocaleDateString('en-KE'),
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [{wch:4},{wch:24},{wch:16},{wch:26},{wch:18},{wch:18},{wch:14}]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Customers')
+    XLSX.writeFile(wb, `customers-${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const filtered = customers.filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.phone||'').includes(search)
+  )
+  const totalSpent = filtered.reduce((a,c) => a+Number(c.total_spent||0), 0)
+
+  const F = ({ k }:{ k:string }) => (
+    <div className="form-group">
+      <label className="form-label">{k==='name'?'Full Name':k==='phone'?'Phone':k==='email'?'Email':'Credit Limit (KES)'}{k==='name'?' *':''}</label>
+      <input type={k==='email'?'email':k==='credit_limit'?'number':'text'}
+        value={(form as any)[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+        className="input" style={{width:'100%'}}/>
+    </div>
+  )
 
   return (
-    <div style={{ maxWidth:900, margin:'0 auto' }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, gap:12 }}>
-        <h1 style={{ fontSize:20, fontWeight:700, color:'var(--txt-1)' }}>Customers</h1>
-        <button onClick={openNew} className="btn btn-primary" style={{ display:'flex', alignItems:'center', gap:6 }}><Plus size={14}/> Add Customer</button>
+    <div className="xl-page">
+      <div className="xl-toolbar">
+        <span className="xl-toolbar-title">Customers</span>
+        <div className="xl-toolbar-sep"/>
+        <button onClick={openNew} className="btn btn-primary"><Plus size={13}/> New Customer</button>
+        <button onClick={exportXlsx} className="btn" disabled={!filtered.length}><Download size={13}/> Export .xlsx</button>
       </div>
 
-      <div className="card" style={{ overflow:'hidden' }}>
-        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', gap:8 }}>
-          <div style={{ position:'relative', flex:1 }}>
-            <Search size={14} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--txt-3)' }}/>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search customers…" className="input" style={{ paddingLeft:30, width:'100%', fontSize:12 }}/>
+      <div className="xl-formulabar">
+        <div className="xl-formulabar-label"><Search size={11} style={{marginRight:4}}/>SEARCH</div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Filter by name or phone…"/>
+        {search && <button onClick={()=>setSearch('')} className="btn btn-ghost" style={{height:28,borderRadius:0,borderLeft:'1px solid var(--border)'}}>✕</button>}
+      </div>
+
+      <div className="xl-kpi-row" style={{margin:0,borderRadius:0,borderLeft:'none',borderRight:'none'}}>
+        {[
+          { label:'Total Customers', value: filtered.length },
+          { label:'Total Spent',     value: `KES ${Math.round(totalSpent).toLocaleString()}` },
+          { label:'Avg Spend',       value: `KES ${filtered.length ? Math.round(totalSpent/filtered.length).toLocaleString() : 0}` },
+        ].map(k => (
+          <div key={k.label} className="xl-kpi" style={{padding:'8px 12px'}}>
+            <div className="xl-kpi-label">{k.label}</div>
+            <div className="xl-kpi-value" style={{fontSize:15}}>{k.value}</div>
           </div>
-        </div>
-        {loading?<div style={{ padding:40, textAlign:'center', color:'var(--txt-3)' }}>Loading…</div>:(
-          <div style={{ overflow:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead><tr style={{ borderBottom:'1px solid var(--border)' }}>
-                {['Name','Phone','Email','Credit Limit','Total Spent',''].map(h=>(
-                  <th key={h} style={{ padding:'10px 16px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--txt-3)', textTransform:'uppercase' }}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {filtered.length===0?<tr><td colSpan={6} style={{ padding:32, textAlign:'center', color:'var(--txt-3)' }}><Users size={32} style={{ margin:'0 auto 8px' }}/><br/>No customers yet</td></tr>
-                :filtered.map(c=>(
-                  <tr key={c.id} style={{ borderBottom:'1px solid var(--border)' }}>
-                    <td style={{ padding:'10px 16px', fontSize:13, fontWeight:600 }}>{c.name}</td>
-                    <td style={{ padding:'10px 16px', fontSize:12, color:'var(--txt-2)' }}>{c.phone||'—'}</td>
-                    <td style={{ padding:'10px 16px', fontSize:12, color:'var(--txt-2)' }}>{c.email||'—'}</td>
-                    <td style={{ padding:'10px 16px', fontSize:12 }}>KES {Number(c.credit_limit||0).toLocaleString()}</td>
-                    <td style={{ padding:'10px 16px', fontSize:12, fontWeight:600, color:'var(--green)' }}>KES {Number(c.total_spent||0).toLocaleString()}</td>
-                    <td style={{ padding:'10px 16px' }}>
-                      <div style={{ display:'flex', gap:4 }}>
-                        <button onClick={()=>openEdit(c)} className="btn btn-ghost" style={{ padding:'4px 8px' }}><Edit size={13}/></button>
-                        <button onClick={()=>del(c.id)} className="btn btn-ghost" style={{ padding:'4px 8px', color:'var(--red)' }}><Trash2 size={13}/></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        ))}
+      </div>
+
+      <div style={{flex:1,overflow:'auto'}}>
+        {loading ? (
+          <div className="loading-center"><div className="spinner"/><span>Loading…</span></div>
+        ) : (
+          <table className="xl-grid">
+            <thead>
+              <tr>
+                <th className="row-num">#</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th className="num">Credit Limit</th>
+                <th className="num">Total Spent</th>
+                <th>Since</th>
+                <th style={{width:72}}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={8} style={{textAlign:'center',color:'var(--txt-3)',height:120,fontSize:12}}>No customers found</td></tr>
+              ) : filtered.map((c,i) => (
+                <tr key={c.id}>
+                  <td className="row-num">{i+1}</td>
+                  <td className="fw-700">{c.name}</td>
+                  <td className="font-mono">{c.phone||'—'}</td>
+                  <td className="muted">{c.email||'—'}</td>
+                  <td className="num">KES {Number(c.credit_limit||0).toLocaleString()}</td>
+                  <td className="num fw-700" style={{color:'var(--green)'}}>KES {Number(c.total_spent||0).toLocaleString()}</td>
+                  <td className="muted">{new Date(c.created_at).toLocaleDateString('en-KE')}</td>
+                  <td>
+                    <div style={{display:'flex',gap:2}}>
+                      <button onClick={()=>openEdit(c)} className="btn btn-ghost btn-icon"><Edit size={12}/></button>
+                      <button onClick={()=>del(c.id)} className="btn btn-ghost btn-icon" style={{color:'var(--red)'}}><Trash2 size={12}/></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {showModal&&(
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div className="card" style={{ width:'100%', maxWidth:400 }}>
-            <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h2 style={{ fontSize:15, fontWeight:700 }}>{editing?'Edit Customer':'New Customer'}</h2>
-              <button onClick={()=>setShowModal(false)} className="btn btn-ghost" style={{ padding:'2px 6px' }}>✕</button>
+      <div className="xl-statusbar">
+        <span className="xl-statusbar-item">Rows: <strong>{filtered.length}</strong></span>
+        <span className="xl-statusbar-sep">|</span>
+        <span className="xl-statusbar-item">SUM(Spent): <strong>KES {Math.round(totalSpent).toLocaleString()}</strong></span>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{editing?'Edit Customer':'New Customer'}</span>
+              <button onClick={()=>setShowModal(false)} className="btn btn-ghost btn-icon">✕</button>
             </div>
-            <div style={{ padding:20, display:'flex', flexDirection:'column', gap:12 }}>
-              {[['Name','name','text',true],['Phone','phone','tel',false],['Email','email','email',false],['Credit Limit (KES)','credit_limit','number',false]].map(([label,key,type,req])=>(
-                <div key={key as string}>
-                  <label style={{ fontSize:12, color:'var(--txt-3)', display:'block', marginBottom:4 }}>{label as string}{req&&' *'}</label>
-                  <input type={type as string} value={(form as any)[key as string]} onChange={e=>setForm(f=>({...f,[key as string]:e.target.value}))} className="input" style={{ width:'100%' }} required={!!req}/>
-                </div>
-              ))}
-              <button onClick={save} disabled={saving||!form.name} className="btn btn-primary" style={{ width:'100%', marginTop:4 }}>{saving?'Saving…':editing?'Update':'Add Customer'}</button>
+            <div className="modal-body">
+              <F k="name"/><F k="phone"/><F k="email"/><F k="credit_limit"/>
+            </div>
+            <div className="modal-footer">
+              <button onClick={()=>setShowModal(false)} className="btn">Cancel</button>
+              <button onClick={save} disabled={saving||!form.name} className="btn btn-primary">{saving?'Saving…':editing?'Update':'Add Customer'}</button>
             </div>
           </div>
         </div>
