@@ -1,180 +1,65 @@
-// Auth uses sessionStorage to track the current logged-in user.
-// User lookup and password verification is done against Supabase.
-// IndexedDB stores user records for offline fallback.
+// Tenant-aware auth client — uses JWT cookie via /api/auth/*
+// Replaces the old Supabase-based auth
 
 export interface User {
   id: string
+  tenant_id: string
   name: string
   email: string
-  role: 'admin' | 'cashier'
-  branch_id: string | null      // null = owner (sees all branches)
-  branch_name: string | null    // human-readable, stored for display
+  role: 'owner' | 'admin' | 'cashier'
+  branch_id: string | null
+  branch_name: string | null
 }
 
-const SESSION_KEY = 'smartpos_user'
-const ACTIVE_BRANCH_KEY = 'smartpos_active_branch' // owner can switch branches
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
+const BRANCH_KEY = 'smartpos_active_branch'
 
 export async function login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    const { supabase } = await import('./supabase')
-
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('*, branches(name)')
-      .eq('email', email.trim().toLowerCase())
-      .single()
-
-    const rawUser = userError ? null : userData
-
-    if (!rawUser) {
-      const { data: userData2 } = await supabase
-        .from('users')
-        .select('*, branches(name)')
-        .eq('email', email.trim())
-        .single()
-
-      if (!userData2) return { success: false, error: 'No account found with this email.' }
-
-      const isValid = await hashPassword(password).then(h => h === userData2.password_hash)
-      if (!isValid) return { success: false, error: 'Incorrect password.' }
-
-      const user: User = {
-        id: userData2.id, name: userData2.name, email: userData2.email,
-        role: userData2.role,
-        branch_id: userData2.branch_id || null,
-        branch_name: (userData2 as any).branches?.name || null,
-      }
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
-      return { success: true, user }
-    }
-
-    const passwordHash = await hashPassword(password)
-    if (passwordHash !== rawUser.password_hash) {
-      return { success: false, error: 'Incorrect password.' }
-    }
-
-    const user: User = {
-      id: rawUser.id, name: rawUser.name, email: rawUser.email,
-      role: rawUser.role,
-      branch_id: rawUser.branch_id || null,
-      branch_name: (rawUser as any).branches?.name || null,
-    }
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
-
-    try {
-      const { storeCurrentUser } = await import('./indexeddb')
-      await storeCurrentUser(user)
-    } catch (_) {}
-
-    return { success: true, user }
-
-  } catch (error: any) {
-    console.error('Login error:', error)
-    try {
-      const { getCachedUser } = await import('./indexeddb')
-      const cachedUser = await getCachedUser(email.trim())
-      if (cachedUser) {
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify(cachedUser))
-        return { success: true, user: { ...cachedUser, branch_id: (cachedUser as any).branch_id || null, branch_name: (cachedUser as any).branch_name || null } }
-      }
-    } catch (_) {}
-    return { success: false, error: 'Could not connect. Check your internet connection.' }
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+    if (!res.ok) return { success: false, error: data.error || 'Login failed' }
+    return { success: true, user: data.user }
+  } catch {
+    return { success: false, error: 'Cannot connect. Check your internet.' }
   }
 }
 
 export async function logout(): Promise<void> {
-  sessionStorage.removeItem(SESSION_KEY)
-  sessionStorage.removeItem(ACTIVE_BRANCH_KEY)
-  try {
-    const { clearCurrentUser } = await import('./indexeddb')
-    await clearCurrentUser()
-  } catch (_) {}
+  await fetch('/api/auth/logout', { method: 'POST' })
+  sessionStorage.removeItem(BRANCH_KEY)
 }
 
-export function getCurrentAuthUser(): User | null {
-  if (typeof window === 'undefined') return null
+export async function getCurrentAuthUser(): Promise<User | null> {
   try {
-    const stored = sessionStorage.getItem(SESSION_KEY)
-    if (stored) return JSON.parse(stored) as User
-  } catch (_) {}
-  return null
+    const res = await fetch('/api/auth/me')
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.user || null
+  } catch {
+    return null
+  }
 }
 
-/** The branch currently being viewed.
- *  - For cashiers: always their assigned branch.
- *  - For admins/owners: the branch they've selected in the UI (or null = all branches).
- */
 export function getActiveBranchId(): string | null {
   if (typeof window === 'undefined') return null
-  const user = getCurrentAuthUser()
-  if (!user) return null
-  // Cashiers are locked to their branch
-  if (user.branch_id) return user.branch_id
-  // Admins can switch: read from sessionStorage
-  try {
-    return sessionStorage.getItem(ACTIVE_BRANCH_KEY) || null
-  } catch (_) { return null }
+  return sessionStorage.getItem(BRANCH_KEY) || null
 }
 
-export function setActiveBranchId(branchId: string | null): void {
+export function setActiveBranchId(id: string | null): void {
   if (typeof window === 'undefined') return
-  if (branchId) {
-    sessionStorage.setItem(ACTIVE_BRANCH_KEY, branchId)
-  } else {
-    sessionStorage.removeItem(ACTIVE_BRANCH_KEY)
-  }
+  if (id) sessionStorage.setItem(BRANCH_KEY, id)
+  else sessionStorage.removeItem(BRANCH_KEY)
 }
 
-export function isAdmin(user: User | null): boolean {
-  return user?.role === 'admin'
-}
-
-export function isCashier(user: User | null): boolean {
-  return user?.role === 'cashier'
-}
-
-export function isOwner(user: User | null): boolean {
-  // Owner = admin with no branch_id (sees all branches)
-  return user?.role === 'admin' && !user?.branch_id
-}
-
+export function isAdmin(user: User | null) { return user?.role === 'admin' || user?.role === 'owner' }
+export function isCashier(user: User | null) { return user?.role === 'cashier' }
+export function isOwner(user: User | null) { return user?.role === 'owner' }
 export function hasPermission(user: User | null, permission: string): boolean {
   if (!user) return false
-  if (user.role === 'admin') return true
-  const cashierPermissions = ['pos', 'sales_history', 'receipts', 'customers']
-  return cashierPermissions.includes(permission)
-}
-
-export async function register(
-  name: string, email: string, password: string,
-  role: 'admin' | 'cashier', branch_id?: string | null
-): Promise<{ success: boolean; user?: User; error?: string }> {
-  try {
-    const { supabase } = await import('./supabase')
-    const passwordHash = await hashPassword(password)
-
-    const { data: newUser, error } = await supabase
-      .from('users')
-      .insert({ name, email: email.trim().toLowerCase(), password_hash: passwordHash, role, branch_id: branch_id || null })
-      .select()
-      .single()
-
-    if (error || !newUser) return { success: false, error: error?.message || 'Failed to create user' }
-
-    const user: User = {
-      id: newUser.id, name: newUser.name, email: newUser.email,
-      role: newUser.role, branch_id: newUser.branch_id || null, branch_name: null
-    }
-    return { success: true, user }
-  } catch (error: any) {
-    return { success: false, error: error.message || 'Registration failed' }
-  }
+  if (user.role === 'admin' || user.role === 'owner') return true
+  return ['pos', 'sales_history', 'receipts', 'customers'].includes(permission)
 }
