@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-process.env.PORT = process.env.PORT || '8080'
+// Must be set BEFORE requiring the server — Next.js standalone reads these at module load
 process.env.HOSTNAME = '0.0.0.0'
-// Trust Railway's reverse proxy so redirects use https://
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+process.env.PORT = process.env.PORT || '8080'
 
 require('/standalone/server.js')
