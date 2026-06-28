@@ -286,63 +286,48 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Configure your POS system settings</p>
+    <div className="xl-page">
+      {/* Ribbon tabs */}
+      <div className="xl-tabs">
+        {tabs.map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`xl-tab${activeTab === tab.id ? ' active' : ''}`}
+              style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <Icon size={12} />{tab.label}
+            </button>
+          )
+        })}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        {/* Tabs */}
-        <div className="border-b">
-          <div className="flex space-x-8 px-6">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        <div className="p-6">
+      {/* Tab Content */}
+      <div className="xl-page-inner">
           {activeTab === 'business' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold">Business Settings</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Business Name
                   </label>
                   <input
                     type="text"
                     value={businessSettings.name}
                     onChange={(e) => setBusinessSettings({ ...businessSettings, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Currency
                   </label>
                   <select
                     value={businessSettings.currency}
                     onChange={(e) => setBusinessSettings({ ...businessSettings, currency: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                   >
                     <option value="KES">KES - Kenyan Shilling</option>
                     <option value="USD">USD - US Dollar</option>
@@ -352,40 +337,40 @@ export default function SettingsPage() {
                 </div>
                 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Address
                   </label>
                   <input
                     type="text"
                     value={businessSettings.address}
                     onChange={(e) => setBusinessSettings({ ...businessSettings, address: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     placeholder="Street address, City, Country"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Phone Number
                   </label>
                   <input
                     type="tel"
                     value={businessSettings.phone}
                     onChange={(e) => setBusinessSettings({ ...businessSettings, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     placeholder="+254 700 000 000"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Email
                   </label>
                   <input
                     type="email"
                     value={businessSettings.email}
                     onChange={(e) => setBusinessSettings({ ...businessSettings, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     placeholder="contact@business.com"
                   />
                 </div>
@@ -399,40 +384,40 @@ export default function SettingsPage() {
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Footer Text
                   </label>
                   <textarea
                     value={receiptSettings.footer}
                     onChange={(e) => setReceiptSettings({ ...receiptSettings, footer: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     rows={3}
                     placeholder="Thank you for your purchase!"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Served By (appears on receipt)
                   </label>
                   <input
                     type="text"
                     value={receiptSettings.served_by}
                     onChange={(e) => setReceiptSettings({ ...receiptSettings, served_by: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     placeholder="e.g. Jane Doe, Front Desk, Cashier 1"
                   />
                   <p className="text-xs text-gray-500 mt-1">Leave blank to use the logged-in user's name</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     Paper Size
                   </label>
                   <select
                     value={receiptSettings.paper_size}
                     onChange={(e) => setReceiptSettings({ ...receiptSettings, paper_size: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                   >
                     <option value="58mm">58mm (Small)</option>
                     <option value="80mm">80mm (Standard)</option>
@@ -474,14 +459,14 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="form-label">
                     VAT Rate (%)
                   </label>
                   <input
                     type="number"
                     value={taxSettings.vat_rate}
                     onChange={(e) => setTaxSettings({ ...taxSettings, vat_rate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     min="0"
                     max="100"
                     step="0.5"
@@ -678,11 +663,10 @@ export default function SettingsPage() {
           )}
 
           {activeTab !== 'staff' && (
-            <div className="pt-6 border-t mt-6">
-              <button onClick={saveSettings} disabled={saving}
-                className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                <Save className="h-4 w-4" />
-                <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+            <div style={{ paddingTop:16, borderTop:'1px solid var(--border)', marginTop:16 }}>
+              <button onClick={saveSettings} disabled={saving} className="btn btn-primary">
+                <Save size={13} />
+                {saving ? 'Saving…' : 'Save Settings'}
               </button>
             </div>
           )}
@@ -691,33 +675,32 @@ export default function SettingsPage() {
 
       {/* Add Staff Modal */}
       {showStaffModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="font-bold text-gray-900">Add Staff Member</h2>
-              <button onClick={() => setShowStaffModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+        <div className="modal-overlay">
+          <div className="modal" style={{maxWidth:400}}>
+            <div className="modal-header">
+              <span className="modal-title">Add Staff Member</span>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowStaffModal(false)}><X size={13} /></button>
             </div>
-            <form onSubmit={handleAddStaff} className="px-5 py-4 space-y-4">
+            <form onSubmit={handleAddStaff}>
+              <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Full Name *</label>
+                <label className="form-label">Full Name *</label>
                 <input required type="text" value={staffForm.name} onChange={e => setStaffForm(p => ({ ...p, name: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input" style={{width:"100%"}}
                   placeholder="e.g. Jane Doe" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Email *</label>
+                <label className="form-label">Email *</label>
                 <input required type="email" value={staffForm.email} onChange={e => setStaffForm(p => ({ ...p, email: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input" style={{width:"100%"}}
                   placeholder="jane@shop.com" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Password *</label>
+                <label className="form-label">Password *</label>
                 <div className="relative">
                   <input required type={showPassword ? 'text' : 'password'} value={staffForm.password}
                     onChange={e => setStaffForm(p => ({ ...p, password: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                    className="input" style={{width:"100%",paddingRight:36}}
                     placeholder="Min 8 characters" minLength={8} />
                   <button type="button" onClick={() => setShowPassword(o => !o)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -727,28 +710,27 @@ export default function SettingsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Role *</label>
+                  <label className="form-label">Role *</label>
                   <select value={staffForm.role} onChange={e => setStaffForm(p => ({ ...p, role: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    className="input" style={{width:"100%"}}>
                     <option value="cashier">Cashier</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Branch</label>
+                  <label className="form-label">Branch</label>
                   <select value={staffForm.branch_id} onChange={e => setStaffForm(p => ({ ...p, branch_id: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    className="input" style={{width:"100%"}}>
                     <option value="">All Branches</option>
                     {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowStaffModal(false)}
-                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={savingStaff}
-                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-                  {savingStaff ? 'Adding...' : 'Add Staff'}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn" onClick={() => setShowStaffModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={savingStaff}>
+                  {savingStaff ? 'Adding…' : 'Add Staff'}
                 </button>
               </div>
             </form>
@@ -758,19 +740,17 @@ export default function SettingsPage() {
 
       {/* Add/Edit Payment Method Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="font-bold text-gray-900">{editingPayment ? 'Edit Payment Method' : 'Add Payment Method'}</h2>
-              <button onClick={() => setShowPaymentModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+        <div className="modal-overlay">
+          <div className="modal" style={{maxWidth:400}}>
+            <div className="modal-header">
+              <span className="modal-title">{editingPayment ? 'Edit Payment Method' : 'Add Payment Method'}</span>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowPaymentModal(false)}><X size={13} /></button>
             </div>
-            <div className="px-5 py-4 space-y-4">
+            <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Type *</label>
+                <label className="form-label">Type *</label>
                 <select value={paymentForm.type} onChange={e => setPaymentForm(p => ({ ...p, type: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                  className="input" style={{width:"100%"}}>
                   <option value="till">M-Pesa Till Number</option>
                   <option value="paybill">M-Pesa Paybill</option>
                   <option value="send_money">Send Money (Phone)</option>
@@ -778,26 +758,26 @@ export default function SettingsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">Label *</label>
+                <label className="form-label">Label *</label>
                 <input type="text" value={paymentForm.label} onChange={e => setPaymentForm(p => ({ ...p, label: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input" style={{width:"100%"}}
                   placeholder="e.g. Main Till" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+                <label className="form-label">
                   {paymentForm.type === 'send_money' ? 'Phone Number *' : paymentForm.type === 'bank' ? 'Account Number *' : 'Number *'}
                 </label>
                 <input type="text" value={paymentForm.number} onChange={e => setPaymentForm(p => ({ ...p, number: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input" style={{width:"100%"}}
                   placeholder={paymentForm.type === 'send_money' ? 'e.g. 0712 345 678' : 'e.g. 123456'} />
               </div>
               {(paymentForm.type === 'paybill' || paymentForm.type === 'bank') && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+                  <label className="form-label">
                     {paymentForm.type === 'paybill' ? 'Account Number' : 'Bank & Branch'}
                   </label>
                   <input type="text" value={paymentForm.account_name} onChange={e => setPaymentForm(p => ({ ...p, account_name: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input" style={{width:"100%"}}
                     placeholder={paymentForm.type === 'paybill' ? 'e.g. your phone number or shop code' : 'e.g. Equity Bank, Kisumu'} />
                 </div>
               )}
@@ -813,12 +793,10 @@ export default function SettingsPage() {
                   Show on printed receipts
                 </label>
               </div>
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowPaymentModal(false)}
-                  className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="button" onClick={handleSavePayment} disabled={savingPayment || !paymentForm.label.trim() || !paymentForm.number.trim()}
-                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-                  {savingPayment ? 'Saving...' : editingPayment ? 'Update' : 'Add'}
+              <div className="modal-footer">
+                <button type="button" className="btn" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={handleSavePayment} disabled={savingPayment || !paymentForm.label.trim() || !paymentForm.number.trim()}>
+                  {savingPayment ? 'Saving…' : editingPayment ? 'Update' : 'Add'}
                 </button>
               </div>
             </div>

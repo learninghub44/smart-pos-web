@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Camera, Package, CheckCircle, X, Save, Download } from 'lucide-react'
+import { Camera, Package, CheckCircle, X, Save, Download, ScanLine } from 'lucide-react'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getAllProducts, getProductByBarcode, updateProductInDB } from '@/lib/indexeddb'
@@ -22,42 +22,26 @@ export default function InventoryCountPage() {
   const [sessionActive, setSessionActive] = useState(false)
   const [sessionName, setSessionName] = useState('')
 
-  useEffect(() => {
-    loadProducts()
-  }, [])
+  useEffect(() => { loadProducts() }, [])
 
   const loadProducts = async () => {
     const products = await getAllProducts()
     setCountItems(products.map(p => ({
-      productId: p.id,
-      productName: p.name,
-      barcode: p.barcode,
-      systemStock: p.stock,
-      countedStock: 0,
-      variance: 0
+      productId: p.id, productName: p.name, barcode: p.barcode,
+      systemStock: p.stock, countedStock: 0, variance: 0
     })))
   }
 
   const handleBarcodeScan = async (barcode: string) => {
     const product = await getProductByBarcode(barcode)
     if (product) {
-      const existingItem = countItems.find(item => item.productId === product.id)
-      if (existingItem) {
-        setCountItems(countItems.map(item =>
-          item.productId === product.id
-            ? { ...item, countedStock: item.countedStock + 1, variance: (item.countedStock + 1) - item.systemStock }
-            : item
-        ))
-      } else {
-        setCountItems([...countItems, {
-          productId: product.id,
-          productName: product.name,
-          barcode: product.barcode,
-          systemStock: product.stock,
-          countedStock: 1,
-          variance: 1 - product.stock
-        }])
-      }
+      setCountItems(prev => {
+        const ex = prev.find(i => i.productId === product.id)
+        if (ex) return prev.map(i => i.productId === product.id
+          ? { ...i, countedStock: i.countedStock + 1, variance: (i.countedStock + 1) - i.systemStock }
+          : i)
+        return [...prev, { productId: product.id, productName: product.name, barcode: product.barcode, systemStock: product.stock, countedStock: 1, variance: 1 - product.stock }]
+      })
       setCurrentBarcode(barcode)
       setShowCameraScanner(false)
     } else {
@@ -65,31 +49,17 @@ export default function InventoryCountPage() {
     }
   }
 
-  // USB barcode scanner integration
-  useBarcodeScanner({
-    onScan: handleBarcodeScan,
-    enabled: sessionActive && !showCameraScanner
-  })
+  useBarcodeScanner({ onScan: handleBarcodeScan, enabled: sessionActive && !showCameraScanner })
 
   const startSession = () => {
-    if (!sessionName.trim()) {
-      alert('Please enter a session name')
-      return
-    }
+    if (!sessionName.trim()) { alert('Enter a session name'); return }
     setSessionActive(true)
     loadProducts()
   }
 
-  const endSession = () => {
-    setSessionActive(false)
-  }
-
   const updateCountedStock = (productId: string, newCount: number) => {
-    setCountItems(countItems.map(item =>
-      item.productId === productId
-        ? { ...item, countedStock: newCount, variance: newCount - item.systemStock }
-        : item
-    ))
+    setCountItems(prev => prev.map(i => i.productId === productId
+      ? { ...i, countedStock: newCount, variance: newCount - i.systemStock } : i))
   }
 
   const saveCount = async () => {
@@ -97,214 +67,174 @@ export default function InventoryCountPage() {
       if (item.countedStock !== item.systemStock) {
         try {
           const { supabase } = await import('@/lib/supabase')
-          await supabase
-            .from('products')
-            .update({ stock: item.countedStock })
-            .eq('id', item.productId)
-          
-          await updateProductInDB({ id: item.productId, stock: item.countedStock } as any)
-        } catch (error) {
-          console.log('Supabase not available, using IndexedDB only')
-          await updateProductInDB({ id: item.productId, stock: item.countedStock } as any)
-        }
+          await supabase.from('products').update({ stock: item.countedStock }).eq('id', item.productId)
+        } catch {}
+        await updateProductInDB({ id: item.productId, stock: item.countedStock } as any)
       }
     }
-    alert('Inventory count saved successfully')
+    alert('Inventory count saved')
     loadProducts()
   }
 
   const exportReport = () => {
-    const report = {
-      sessionName,
-      date: new Date().toISOString(),
-      items: countItems.filter(item => item.countedStock > 0)
-    }
-    
+    const report = { sessionName, date: new Date().toISOString(), items: countItems.filter(i => i.countedStock > 0) }
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = `inventory-count-${sessionName}-${Date.now()}.json`
-    a.click()
+    a.href = url; a.download = `inventory-count-${sessionName}-${Date.now()}.json`; a.click()
     URL.revokeObjectURL(url)
   }
 
-  const countedItems = countItems.filter(item => item.countedStock > 0)
-  const varianceItems = countItems.filter(item => item.variance !== 0)
+  const countedItems = countItems.filter(i => i.countedStock > 0)
+  const varianceItems = countItems.filter(i => i.variance !== 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Inventory Count</h1>
-          <p className="text-gray-600 mt-1">Rapid stock counting with barcode scanner</p>
-        </div>
-        <button
-          onClick={() => setShowCameraScanner(true)}
-          disabled={!sessionActive}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          <Camera className="h-5 w-5" />
-          <span>Scan</span>
-        </button>
+    <div className="xl-page">
+      {/* Toolbar */}
+      <div className="xl-toolbar">
+        <span className="xl-toolbar-title">Inventory Count</span>
+        <div className="xl-toolbar-sep" />
+        {sessionActive ? (
+          <>
+            <button className="btn btn-primary" onClick={saveCount}><Save size={13} /> Save Count</button>
+            <button className="btn" onClick={exportReport}><Download size={13} /> Export</button>
+            <button className="btn" onClick={() => setShowCameraScanner(true)}><Camera size={13} /> Scan</button>
+            <div className="xl-toolbar-sep" />
+            <button className="btn btn-ghost" style={{ color:'var(--red)' }} onClick={() => setSessionActive(false)}><X size={13} /> End Session</button>
+          </>
+        ) : null}
+        <div style={{ flex:1 }} />
+        {sessionActive && currentBarcode && (
+          <span style={{ fontSize:11, color:'var(--green)', display:'flex', alignItems:'center', gap:4 }}>
+            <CheckCircle size={12} /> Last: {currentBarcode}
+          </span>
+        )}
       </div>
 
-      {!sessionActive ? (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4">Start New Count Session</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Session Name
-              </label>
-              <input
-                type="text"
-                value={sessionName}
-                onChange={(e) => setSessionName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Monthly Count - June 2026"
-              />
+      <div className="xl-page-inner">
+        {!sessionActive ? (
+          /* Start session card */
+          <div className="card" style={{ maxWidth:420, margin:'40px auto', padding:24 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+              <ScanLine size={20} style={{ color:'var(--xl-green)' }} />
+              <span style={{ fontSize:15, fontWeight:700 }}>Start New Count Session</span>
             </div>
-            <button
-              onClick={startSession}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700"
-            >
+            <div className="form-group">
+              <label className="form-label">Session Name</label>
+              <input className="input" style={{ width:'100%' }} value={sessionName}
+                onChange={e => setSessionName(e.target.value)}
+                placeholder="e.g. Monthly Count — June 2026"
+                onKeyDown={e => e.key === 'Enter' && startSession()} />
+            </div>
+            <button className="btn btn-primary" style={{ width:'100%', marginTop:8 }} onClick={startSession}>
               Start Session
             </button>
           </div>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-semibold">{sessionName}</h2>
-                <p className="text-sm text-gray-600">
-                  {countedItems.length} items counted
-                </p>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={saveCount}
-                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                >
-                  <Save className="h-5 w-5" />
-                  <span>Save</span>
-                </button>
-                <button
-                  onClick={exportReport}
-                  className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                >
-                  <Download className="h-5 w-5" />
-                  <span>Export</span>
-                </button>
-                <button
-                  onClick={endSession}
-                  className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-                >
-                  <X className="h-5 w-5" />
-                  <span>End</span>
-                </button>
-              </div>
+        ) : (
+          <>
+            {/* KPI row */}
+            <div className="xl-kpi-row" style={{ marginBottom:16 }}>
+              <div className="xl-kpi"><span className="xl-kpi-label">Session</span><span className="xl-kpi-value" style={{ fontSize:14 }}>{sessionName}</span></div>
+              <div className="xl-kpi"><span className="xl-kpi-label">Items Counted</span><span className="xl-kpi-value xl-kpi-up">{countedItems.length}</span></div>
+              <div className="xl-kpi"><span className="xl-kpi-label">Variances</span><span className="xl-kpi-value xl-kpi-down">{varianceItems.length}</span></div>
+              <div className="xl-kpi"><span className="xl-kpi-label">Total Products</span><span className="xl-kpi-value">{countItems.length}</span></div>
             </div>
 
-            {currentBarcode && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="text-green-800 font-medium">
-                    Last scanned: {currentBarcode}
-                  </span>
-                </div>
+            {/* Counted items grid */}
+            <div className="xl-grid-wrap" style={{ marginBottom:16 }}>
+              <div style={{ padding:'6px 12px', background:'var(--surface-2)', borderBottom:'1px solid var(--border)', fontSize:11, fontWeight:700, color:'var(--txt-2)', textTransform:'uppercase', letterSpacing:'.04em' }}>
+                Counted Items
               </div>
-            )}
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-semibold mb-4">Counted Items</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="xl-grid">
                 <thead>
-                  <tr className="border-b">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Product</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Barcode</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">System Stock</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Counted</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Variance</th>
+                  <tr>
+                    <th className="row-num">#</th>
+                    <th>Product</th>
+                    <th>Barcode</th>
+                    <th className="num">System Stock</th>
+                    <th className="num">Counted</th>
+                    <th className="num">Variance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {countedItems.map((item) => (
-                    <tr key={item.productId} className="border-b">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{item.productName}</div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{item.barcode}</td>
-                      <td className="px-4 py-3 text-gray-600">{item.systemStock}</td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
+                  {countedItems.map((item, i) => (
+                    <tr key={item.productId}>
+                      <td className="row-num muted">{i+1}</td>
+                      <td className="fw-700">{item.productName}</td>
+                      <td className="font-mono muted">{item.barcode}</td>
+                      <td className="num">{item.systemStock}</td>
+                      <td className="num">
+                        <input type="number" className="input input-sm" style={{ width:64, textAlign:'right' }}
                           value={item.countedStock}
-                          onChange={(e) => updateCountedStock(item.productId, parseInt(e.target.value) || 0)}
-                          className="w-20 px-2 py-1 border border-gray-300 rounded"
-                        />
+                          onChange={e => updateCountedStock(item.productId, parseInt(e.target.value)||0)} />
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`font-medium ${
-                          item.variance === 0
-                            ? 'text-gray-600'
-                            : item.variance > 0
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}>
-                          {item.variance > 0 ? '+' : ''}{item.variance}
+                      <td className="num">
+                        <span className={item.variance===0?'muted':item.variance>0?'text-green':'text-red'} style={{ fontWeight:600 }}>
+                          {item.variance>0?'+':''}{item.variance}
                         </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {countedItems.length === 0 && (
+                <div className="empty-state">
+                  <Package size={28} style={{ margin:'0 auto 8px', opacity:.3 }} />
+                  <div className="empty-state-title">No items counted yet</div>
+                  <div className="empty-state-sub">Scan barcodes or use USB scanner to count items</div>
+                </div>
+              )}
             </div>
 
-            {countedItems.length === 0 && (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No items counted yet</p>
-                <p className="text-sm text-gray-500 mt-2">Scan barcodes or use USB scanner to count items</p>
+            {/* Variance report */}
+            {varianceItems.length > 0 && (
+              <div className="xl-grid-wrap">
+                <div style={{ padding:'6px 12px', background:'var(--red-lt)', borderBottom:'1px solid var(--border)', fontSize:11, fontWeight:700, color:'var(--red)', textTransform:'uppercase', letterSpacing:'.04em' }}>
+                  Variance Report — {varianceItems.length} discrepancies
+                </div>
+                <table className="xl-grid">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Barcode</th>
+                      <th className="num">System</th>
+                      <th className="num">Counted</th>
+                      <th className="num">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {varianceItems.map(item => (
+                      <tr key={item.productId}>
+                        <td className="fw-700">{item.productName}</td>
+                        <td className="font-mono muted">{item.barcode}</td>
+                        <td className="num">{item.systemStock}</td>
+                        <td className="num">{item.countedStock}</td>
+                        <td className="num">
+                          <span className={item.variance>0?'text-green':'text-red'} style={{ fontWeight:700 }}>
+                            {item.variance>0?'+':''}{item.variance}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-          </div>
+          </>
+        )}
+      </div>
 
-          {varianceItems.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold mb-4">Variance Report</h3>
-              <div className="space-y-2">
-                {varianceItems.map((item) => (
-                  <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900">{item.productName}</div>
-                      <div className="text-sm text-gray-600">{item.barcode}</div>
-                    </div>
-                    <div className={`font-bold ${
-                      item.variance > 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {item.variance > 0 ? '+' : ''}{item.variance}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+      {/* Status bar */}
+      <div className="xl-statusbar">
+        <span className="xl-statusbar-item">SESSION: {sessionActive ? sessionName : 'None'}</span>
+        <span className="xl-statusbar-sep">|</span>
+        <span className="xl-statusbar-item">COUNTED: {countedItems.length}</span>
+        <span className="xl-statusbar-sep">|</span>
+        <span className="xl-statusbar-item">VARIANCES: {varianceItems.length}</span>
+      </div>
 
       {showCameraScanner && (
-        <BarcodeScanner
-          onScan={handleBarcodeScan}
-          onClose={() => setShowCameraScanner(false)}
-          continuous={true}
-          showFlashlight={true}
-        />
+        <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowCameraScanner(false)} continuous={true} showFlashlight={true} />
       )}
     </div>
   )
