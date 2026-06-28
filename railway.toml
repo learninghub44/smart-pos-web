@@ -1,9 +1,9 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public"
+buildCommand = "npm install && npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && cp -r .next/standalone /standalone"
 
 [deploy]
-startCommand = "node start.js"
+startCommand = "PORT=${PORT:-8080} HOSTNAME=0.0.0.0 node /standalone/server.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

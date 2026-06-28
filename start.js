@@ -3,4 +3,7 @@
 process.env.PORT = process.env.PORT || '8080'
 process.env.HOSTNAME = '0.0.0.0'
 
-require('./.next/standalone/server.js')
+const path = require('path')
+const serverPath = path.join(__dirname, '.next', 'standalone', 'server.js')
+
+require(serverPath)
