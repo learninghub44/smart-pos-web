@@ -20,7 +20,7 @@ export interface Tenant {
   business_name: string
   slug: string
   plan_id: string
-  status: 'trial' | 'active' | 'suspended' | 'cancelled'
+  status: 'pending_payment' | 'trial' | 'active' | 'suspended' | 'cancelled'
   trial_ends_at: string | null
   currency: string
 }
