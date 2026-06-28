@@ -23,8 +23,8 @@ export default function ReturnsPage() {
 
   const loadReturns = async () => {
     try {
-      const res = await fetch('/api/returns'); const json = await res.json(); const data = json.data ?? json; const error = null
-      if (data && !error) { setReturns(data); return }
+      const res = await fetch('/api/returns'); const json = await res.json(); const data = json.data ?? json;
+      if (Array.isArray(data)) { setReturns(data); return }
     } catch {}
     const { getAllReturns } = await import('@/lib/indexeddb')
     setReturns(await getAllReturns())
@@ -32,8 +32,8 @@ export default function ReturnsPage() {
 
   const loadSales = async () => {
     try {
-      const res2 = await fetch('/api/sales?limit=50'); const json2 = await res2.json(); const data = json2.data ?? json2; const error = null
-      if (data && !error) { setSales(data); return }
+      const res2 = await fetch('/api/sales?limit=50'); const json2 = await res2.json(); const data = json2.data ?? json2;
+      if (Array.isArray(data)) { setSales(data); return }
     } catch {}
     const { getAllSales } = await import('@/lib/indexeddb')
     setSales(await getAllSales())

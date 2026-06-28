@@ -16,7 +16,7 @@ export default function SalesHistoryPage() {
     setLoading(true)
     try {
       const res = await fetch(`/api/sales?from=${from}T00:00:00Z&to=${to}T23:59:59Z&limit=500`)
-      if (res.ok) setSales(await res.json())
+      if (res.ok) { const j = await res.json(); const d = j.data ?? j; if (Array.isArray(d)) setSales(d) }
     } catch {}
     setLoading(false)
   }

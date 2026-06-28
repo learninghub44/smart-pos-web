@@ -120,8 +120,9 @@ export async function getTenantPlan(tenantId: string) {
 
 export function isTenantActive(tenant: { status: string; trial_ends_at: string | null }): boolean {
   if (tenant.status === 'active') return true
+  if (tenant.status === 'pending_payment') return false  // must pay first
   if (tenant.status === 'trial') {
-    if (!tenant.trial_ends_at) return true
+    if (!tenant.trial_ends_at) return true  // trial started, no end date set yet
     return new Date(tenant.trial_ends_at) > new Date()
   }
   return false

@@ -15,7 +15,7 @@ export default function BrandsPage() {
 
   async function load() {
     setLoading(true)
-    try { const r = await fetch('/api/brands'); if (r.ok) setBrands(await r.json()) } catch {}
+    try { const r = await fetch('/api/brands'); if (r.ok) { const j = await r.json(); const d = j.data ?? j; if (Array.isArray(d)) setBrands(d) } } catch {}
     setLoading(false)
   }
 

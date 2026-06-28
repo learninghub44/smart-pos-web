@@ -19,7 +19,7 @@ export default function SuppliersPage() {
 
   async function load() {
     setLoading(true)
-    try { const r = await fetch('/api/suppliers'); if (r.ok) setSuppliers(await r.json()) } catch {}
+    try { const r = await fetch('/api/suppliers'); if (r.ok) { const j = await r.json(); const d = j.data ?? j; if (Array.isArray(d)) setSuppliers(d) } } catch {}
     setLoading(false)
   }
 

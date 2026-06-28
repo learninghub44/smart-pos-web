@@ -58,7 +58,7 @@ export default function ReceiptsPage() {
       const res = await fetch(`/api/sales?${params}`)
       if (res.ok) {
         const json = await res.json()
-        const list: any[] = json.data ?? json
+        const list: any[] = Array.isArray(json.data ?? json) ? (json.data ?? json) : []
         const sale = list[0]
 
         if (sale) {
@@ -67,7 +67,7 @@ export default function ReceiptsPage() {
           let items: any[] = []
           if (itemsRes.ok) {
             const itemsJson = await itemsRes.json()
-            items = itemsJson.data ?? itemsJson
+            items = Array.isArray(itemsJson.data ?? itemsJson) ? (itemsJson.data ?? itemsJson) : []
           }
 
           setFoundSale(sale)

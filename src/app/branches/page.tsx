@@ -38,19 +38,24 @@ export default function BranchesPage() {
 
   const loadBranches = async () => {
     try {
-      const data: Branch[] = await apiBranch('GET')
-      if (data) {
+      const res = await fetch('/api/branches')
+      if (!res.ok) return
+      const json = await res.json()
+      const data: Branch[] = json.data ?? json
+      if (Array.isArray(data)) {
         setBranches(data)
         // Load users per branch via tenant_users API
-        const res = await fetch('/api/settings/users')
-        if (res.ok) {
-          const json = await res.json()
-          const users: BranchUser[] = json.data ?? json
+        const res2 = await fetch('/api/settings/users')
+        if (res2.ok) {
+          const json2 = await res2.json()
+          const users: BranchUser[] = json2.data ?? json2
           const map: Record<string, BranchUser[]> = {}
-          for (const u of users) {
-            if ((u as any).branch_id) {
-              if (!map[(u as any).branch_id]) map[(u as any).branch_id] = []
-              map[(u as any).branch_id].push(u)
+          if (Array.isArray(users)) {
+            for (const u of users) {
+              if ((u as any).branch_id) {
+                if (!map[(u as any).branch_id]) map[(u as any).branch_id] = []
+                map[(u as any).branch_id].push(u)
+              }
             }
           }
           setBranchUsers(map)
