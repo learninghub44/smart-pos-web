@@ -666,7 +666,6 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
-      </div>
 
       {showStaffModal && (
         <div className="modal-overlay">
