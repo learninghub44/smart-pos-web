@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { login } from '@/lib/auth'
+import { login, getRememberedBrand } from '@/lib/auth'
 import {
   Eye, EyeOff, ArrowRight, ShoppingCart,
   Smartphone, GitBranch, CreditCard, Printer,
@@ -16,7 +16,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [brand, setBrand] = useState<{ business_name: string | null; logo_url: string | null } | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    setBrand(getRememberedBrand())
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,12 +64,14 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <div style={{ width: 48, height: 48, background: '#e8891a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(232,137,26,0.4)' }}>
-            <ShoppingCart size={22} color="#fff" strokeWidth={2.2} />
+          <div style={{ width: 48, height: 48, background: brand?.logo_url ? '#fff' : '#e8891a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(232,137,26,0.4)', overflow: 'hidden' }}>
+            {brand?.logo_url
+              ? <img src={brand.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+              : <ShoppingCart size={22} color="#fff" strokeWidth={2.2} />}
           </div>
           <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.02em' }}>Smart POS</div>
-            <div style={{ fontSize: 10, color: '#e8891a', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>by Zetu Business Solutions</div>
+            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.02em' }}>{brand?.business_name || 'Smart POS'}</div>
+            <div style={{ fontSize: 10, color: '#e8891a', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>{brand?.business_name ? 'Powered by Smart POS' : 'by Zetu Business Solutions'}</div>
           </div>
         </div>
 
@@ -119,12 +126,14 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="mobile-logo" style={{ alignItems: 'center', gap: 10, marginBottom: 40 }}>
-            <div style={{ width: 40, height: 40, background: '#e8891a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShoppingCart size={18} color="#fff" strokeWidth={2.2} />
+            <div style={{ width: 40, height: 40, background: brand?.logo_url ? '#fff' : '#e8891a', border: brand?.logo_url ? '1px solid #f0f4fd' : 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {brand?.logo_url
+                ? <img src={brand.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 3 }} />
+                : <ShoppingCart size={18} color="#fff" strokeWidth={2.2} />}
             </div>
             <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>Smart POS</div>
-              <div style={{ fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>by Zetu Business Solutions</div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>{brand?.business_name || 'Smart POS'}</div>
+              <div style={{ fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>{brand?.business_name ? 'Powered by Smart POS' : 'by Zetu Business Solutions'}</div>
             </div>
           </div>
 

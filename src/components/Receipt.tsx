@@ -31,9 +31,14 @@ export default function Receipt({
 }: ReceiptProps) {
   const receiptRef = useRef<HTMLDivElement>(null)
   const [settings, setSettings] = useState<any>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     loadSettings()
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/tenant/logo').then(r => r.json()).then(d => { if (d.logo_url) setLogoUrl(d.logo_url) }).catch(() => {})
   }, [])
 
   const loadSettings = async () => {
@@ -87,6 +92,14 @@ export default function Receipt({
     <div id="receipt" ref={receiptRef} className="p-4 bg-white text-xs">
       {/* Header */}
       <div className="text-center mb-3 pb-2.5 border-b-2 border-gray-900">
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="mx-auto mb-1.5"
+            style={{ maxHeight: 48, maxWidth: '60%', objectFit: 'contain' }}
+          />
+        )}
         <p className="font-bold text-base uppercase tracking-wide leading-tight">{bizName}</p>
         {bizAddress && <p className="text-gray-600 text-xs mt-1">{bizAddress}</p>}
         {(bizPhone || bizEmail) && (

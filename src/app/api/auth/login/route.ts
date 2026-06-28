@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     // Find user with tenant info
     const user = await queryOne<any>(`
       SELECT tu.*, t.status as tenant_status, t.plan_id, t.business_name,
-             t.trial_ends_at, t.currency, b.name as branch_name
+             t.trial_ends_at, t.currency, t.logo_url, b.name as branch_name
       FROM tenant_users tu
       JOIN tenants t ON t.id = tu.tenant_id
       LEFT JOIN branches b ON b.id = tu.branch_id
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
         currency: user.currency,
         tenant_status: user.tenant_status,
         trial_ends_at: user.trial_ends_at,
+        logo_url: user.logo_url,
       },
     })
     response.headers.set('Set-Cookie', makeCookie(token))

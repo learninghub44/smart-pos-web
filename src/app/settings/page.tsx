@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Save, Building2, Receipt, DollarSign, Users, Plus, X, Eye, EyeOff, Settings, CreditCard, Pencil, Trash2, Upload, Trash } from 'lucide-react'
-import { getCurrentAuthUser, isOwner, isAdmin } from '@/lib/auth'
+import { getCurrentAuthUser, isOwner, isAdmin, updateRememberedLogo } from '@/lib/auth'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
@@ -289,7 +289,7 @@ export default function SettingsPage() {
       try {
         const res = await fetch('/api/tenant/logo', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ logo_url: dataUrl }) })
         const data = await res.json()
-        if (res.ok) setLogoUrl(dataUrl)
+        if (res.ok) { setLogoUrl(dataUrl); updateRememberedLogo(dataUrl) }
         else setLogoError(data.error || 'Upload failed')
       } catch { setLogoError('Network error') }
       setLogoSaving(false)
@@ -302,7 +302,7 @@ export default function SettingsPage() {
     setLogoSaving(true)
     try {
       const res = await fetch('/api/tenant/logo', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ logo_url: null }) })
-      if (res.ok) setLogoUrl(null)
+      if (res.ok) { setLogoUrl(null); updateRememberedLogo(null) }
       else setLogoError('Failed to remove logo')
     } catch { setLogoError('Network error') }
     setLogoSaving(false)

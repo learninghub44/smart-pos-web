@@ -9,9 +9,48 @@ export interface User {
   role: 'owner' | 'admin' | 'cashier'
   branch_id: string | null
   branch_name: string | null
+  business_name?: string
+  logo_url?: string | null
 }
 
 const BRANCH_KEY = 'smartpos_active_branch'
+const BRAND_KEY = 'smartpos_brand'
+
+export interface RememberedBrand {
+  business_name: string | null
+  logo_url: string | null
+}
+
+export function getRememberedBrand(): RememberedBrand | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(BRAND_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function rememberBrand(user: User): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(BRAND_KEY, JSON.stringify({
+      business_name: user.business_name || null,
+      logo_url: user.logo_url || null,
+    }))
+  } catch {}
+}
+
+export function updateRememberedLogo(logo_url: string | null): void {
+  if (typeof window === 'undefined') return
+  try {
+    const current = getRememberedBrand()
+    localStorage.setItem(BRAND_KEY, JSON.stringify({
+      business_name: current?.business_name || null,
+      logo_url,
+    }))
+  } catch {}
+}
 
 export async function login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
@@ -22,6 +61,7 @@ export async function login(email: string, password: string): Promise<{ success:
     })
     const data = await res.json()
     if (!res.ok) return { success: false, error: data.error || 'Login failed' }
+    if (data.user) rememberBrand(data.user)
     return { success: true, user: data.user }
   } catch {
     return { success: false, error: 'Cannot connect. Check your internet.' }
@@ -31,6 +71,7 @@ export async function login(email: string, password: string): Promise<{ success:
 export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' })
   sessionStorage.removeItem(BRANCH_KEY)
+  try { localStorage.removeItem(BRAND_KEY) } catch {}
 }
 
 export async function getCurrentAuthUser(): Promise<User | null> {
