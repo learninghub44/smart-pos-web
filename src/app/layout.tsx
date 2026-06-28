@@ -11,8 +11,8 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Smart POS | Zetu Business Solutions",
-  description: "Smart POS — Point of Sale System for Kenyan Shops by Zetu Business Solutions",
+  title: "ZetuPOS — The POS System Built for Kenya | M-Pesa, Multi-Branch, Works Offline",
+  description: "ZetuPOS is a modern Point of Sale system for Kenyan shops. M-Pesa integrated, works offline, multi-branch. Start your 14-day free trial today.",
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
