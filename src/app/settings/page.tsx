@@ -304,10 +304,10 @@ export default function SettingsPage() {
       {/* Tab Content */}
       <div className="xl-page-inner">
           {activeTab === 'business' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold">Business Settings</h2>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              <h2 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)",marginBottom:12}}>Business Settings</h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="form-row">
                 <div>
                   <label className="form-label">
                     Business Name
@@ -379,10 +379,10 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'receipt' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold">Receipt Settings</h2>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              <h2 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)",marginBottom:12}}>Receipt Settings</h2>
               
-              <div className="space-y-6">
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
                 <div>
                   <label className="form-label">
                     Footer Text
@@ -407,7 +407,7 @@ export default function SettingsPage() {
                     className="input" style={{width:"100%"}}
                     placeholder="e.g. Jane Doe, Front Desk, Cashier 1"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Leave blank to use the logged-in user's name</p>
+                  <p className="muted" style={{fontSize:11}}>Leave blank to use the logged-in user's name</p>
                 </div>
 
                 <div>
@@ -432,7 +432,7 @@ export default function SettingsPage() {
                     onChange={(e) => setReceiptSettings({ ...receiptSettings, auto_print: e.target.checked })}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <label htmlFor="auto-print" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="auto-print" style={{fontSize:12,color:"var(--txt-1)"}}>
                     Auto-print receipts after sale
                   </label>
                 </div>
@@ -441,10 +441,10 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'tax' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold">Tax Settings</h2>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              <h2 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)",marginBottom:12}}>Tax Settings</h2>
               
-              <div className="space-y-6">
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
                 <div className="flex items-center space-x-3">
                   <input
                     type="checkbox"
@@ -453,7 +453,7 @@ export default function SettingsPage() {
                     onChange={(e) => setTaxSettings({ ...taxSettings, enabled: e.target.checked })}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <label htmlFor="tax-enabled" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="tax-enabled" style={{fontSize:12,color:"var(--txt-1)"}}>
                     Enable Tax/VAT
                   </label>
                 </div>
@@ -473,8 +473,8 @@ export default function SettingsPage() {
                   />
                 </div>
                 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">
+                <div style={{background:"var(--surface-2)",padding:12,border:"1px solid var(--border)"}}>
+                  <p className="muted" style={{fontSize:12}}>
                     <strong>Note:</strong> When tax is enabled, it will be automatically calculated and added to product prices during checkout.
                   </p>
                 </div>
@@ -483,48 +483,48 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'payment' && (
-            <div className="space-y-6">
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold">Payment Methods</h2>
-                  <p className="text-sm text-gray-500 mt-1">Till, Paybill, and Send Money numbers shown on every printed receipt</p>
+                  <h2 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)",marginBottom:12}}>Payment Methods</h2>
+                  <p className="muted" style={{fontSize:11}}>Till, Paybill, and Send Money numbers shown on every printed receipt</p>
                 </div>
                 <button
                   onClick={openAddPayment}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 font-semibold text-sm flex-shrink-0"
+                  className="btn btn-primary"
                 >
                   <Plus className="h-4 w-4" /> Add
                 </button>
               </div>
 
               {paymentMethods.length === 0 ? (
-                <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-8 text-center">
+                <div className="empty-state">
                   <CreditCard className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No payment methods yet. Add a Till, Paybill, or Send Money number.</p>
+                  <p className="muted" style={{fontSize:11}}>No payment methods yet. Add a Till, Paybill, or Send Money number.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {paymentMethods.map((m) => {
                     const typeLabel = m.type === 'till' ? 'Till Number' : m.type === 'paybill' ? 'Paybill' : m.type === 'send_money' ? 'Send Money' : 'Bank Account'
                     return (
-                      <div key={m.id} className="flex items-center justify-between gap-4 bg-white border border-gray-200 rounded-xl p-4">
+                      <div key={m.id} className="card" style={{padding:"8px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${m.active ? 'bg-green-50' : 'bg-gray-100'}`}>
-                            <CreditCard className={`h-4 w-4 ${m.active ? 'text-green-600' : 'text-gray-400'}`} />
+                          <div style={{width:28,height:28,borderRadius:'var(--radius)',display:'flex',alignItems:'center',justifyContent:'center',background:m.active?'var(--green-lt)':'var(--surface-2)',flexShrink:0}}>
+                            <CreditCard style={{color:m.active?'var(--green)':'var(--txt-3)'}} />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm truncate">{m.label} <span className="text-gray-400 font-normal">· {typeLabel}</span></p>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p style={{fontWeight:600,fontSize:12}}>{m.label} <span style={{color:"var(--txt-3)",fontWeight:400}}>· {typeLabel}</span></p>
+                            <p className="muted" style={{fontSize:11}}>
                               {m.number}{m.account_name ? ` · Acc: ${m.account_name}` : ''}
                               {!m.active && <span className="text-amber-600 ml-2">Hidden from receipts</span>}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <button onClick={() => openEditPayment(m)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <button onClick={() => openEditPayment(m)} className="btn btn-ghost btn-icon">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => handleDeletePayment(m.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                          <button onClick={() => handleDeletePayment(m.id)} className="btn btn-ghost btn-icon" style={{color:"var(--red)"}}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -539,17 +539,17 @@ export default function SettingsPage() {
           {/* Staff Tab */}
 
           {activeTab === 'system' && (
-            <div className="space-y-6">
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">System & Cache</h3>
-                <p className="text-sm text-gray-500">Manage offline cache and local data</p>
+                <h3 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)"}}>System & Cache</h3>
+                <p className="muted" style={{fontSize:11}}>Manage offline cache and local data</p>
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+              <div className="card" style={{padding:16,marginBottom:12}}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">Clear Offline Cache</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p style={{fontWeight:600,fontSize:12}}>Clear Offline Cache</p>
+                    <p className="muted" style={{fontSize:11}}>
                       Removes all locally cached products, sales, and customers from this browser.
                       Fresh data will be loaded from the server on next visit.
                     </p>
@@ -572,18 +572,18 @@ export default function SettingsPage() {
                         window.location.reload()
                       }
                     }}
-                    className="flex-shrink-0 px-4 py-2 bg-orange-600 text-white rounded-xl text-sm font-semibold hover:bg-orange-700 transition-colors"
+                    className="btn" style={{background:"var(--orange)",color:"#fff",borderColor:"var(--orange)"}}
                   >
                     Clear Cache
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white border border-red-200 rounded-xl p-5 space-y-4">
+              <div className="card" style={{padding:16,marginBottom:12,borderColor:"var(--red)"}}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-semibold text-red-700 text-sm">Force Sync from Server</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="muted" style={{fontSize:11}}>
                       Clears local cache and reloads all products fresh from Supabase.
                       Use this if products are not showing or showing deleted items.
                     </p>
@@ -599,16 +599,16 @@ export default function SettingsPage() {
                         alert('Done. Go to Inventory to reload.')
                       }
                     }}
-                    className="flex-shrink-0 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors"
+                    className="btn btn-red"
                   >
                     Force Sync
                   </button>
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs text-gray-500 font-medium mb-2">TIPS</p>
-                <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
+              <div style={{background:"var(--surface-2)",padding:12,border:"1px solid var(--border)"}}>
+                <p className="form-label">TIPS</p>
+                <ul style={{paddingLeft:14,fontSize:11,color:"var(--txt-3)"}}>
                   <li>Products deleted on one device may still show on others until cache is cleared</li>
                   <li>If a barcode says "already exists" for a deleted product, click Force Sync</li>
                   <li>Cache is per-browser — clear on each device separately</li>
@@ -618,45 +618,45 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'staff' && (
-            <div className="space-y-5">
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Staff Management</h2>
+                <h2 style={{fontSize:13,fontWeight:700,color:"var(--txt-1)",marginBottom:12}}>Staff Management</h2>
                 <button onClick={() => setShowStaffModal(true)}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700">
+                  className="btn btn-primary">
                   <Plus className="w-4 h-4" /> Add Staff
                 </button>
               </div>
 
-              <div className="space-y-2">
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {staffList.map(u => (
-                  <div key={u.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                  <div key={u.id} className="card" style={{padding:"8px 12px",display:"flex",alignItems:"center",gap:12}}>
                     <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-blue-700 text-sm font-bold">{u.name?.charAt(0)?.toUpperCase()}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm">{u.name}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
+                      <p style={{fontWeight:600,fontSize:12}}>{u.name}</p>
+                      <p className="muted" style={{fontSize:11}}>{u.email}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                         {u.role}
                       </span>
                       {(u as any).branches?.name ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium">
+                        <span className="badge badge-gray">
                           {(u as any).branches.name}
                         </span>
                       ) : (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">All Branches</span>
                       )}
                       <button onClick={() => handleDeleteStaff(u.id, u.name)}
-                        className="p-1.5 hover:bg-red-50 rounded-lg ml-1">
+                        className="btn btn-ghost btn-icon" style={{color:"var(--red)"}}>
                         <X className="w-4 h-4 text-red-400" />
                       </button>
                     </div>
                   </div>
                 ))}
                 {staffList.length === 0 && (
-                  <p className="text-center text-gray-400 py-8 text-sm">No staff yet. Add your first staff member.</p>
+                  <p className="empty-state">No staff yet. Add your first staff member.</p>
                 )}
               </div>
             </div>
@@ -703,12 +703,12 @@ export default function SettingsPage() {
                     className="input" style={{width:"100%",paddingRight:36}}
                     placeholder="Min 8 characters" minLength={8} />
                   <button type="button" onClick={() => setShowPassword(o => !o)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--txt-3)"}}>
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="form-row">
                 <div>
                   <label className="form-label">Role *</label>
                   <select value={staffForm.role} onChange={e => setStaffForm(p => ({ ...p, role: e.target.value }))}
@@ -789,7 +789,7 @@ export default function SettingsPage() {
                   onChange={(e) => setPaymentForm(p => ({ ...p, active: e.target.checked }))}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label htmlFor="payment-active" className="text-sm font-medium text-gray-700">
+                <label htmlFor="payment-active" style={{fontSize:12,color:"var(--txt-1)"}}>
                   Show on printed receipts
                 </label>
               </div>
