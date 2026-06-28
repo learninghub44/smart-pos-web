@@ -29,6 +29,7 @@ export interface JWTPayload {
   userId: string
   tenantId: string
   role: string
+  tenantStatus?: string   // included so middleware can guard without a DB call
   iat?: number
   exp?: number
 }

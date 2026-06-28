@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Check, Zap, Star, ArrowLeft, AlertCircle, Clock, TrendingUp, Shield } from 'lucide-react'
 
 const PLANS = [
@@ -23,8 +23,10 @@ interface SubscriptionInfo {
   status: string
 }
 
-export default function BillingPage() {
+function BillingPageInner() {
   const router = useRouter()
+  const params = useSearchParams()
+  const isOnboarding = params.get('onboarding') === '1'
   const [tenant, setTenant] = useState<TenantInfo | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string>('business')
@@ -122,6 +124,24 @@ export default function BillingPage() {
         <button onClick={() => router.push('/dashboard')} style={s.back}>
           <ArrowLeft size={16} /> Back to Dashboard
         </button>
+
+        {/* ── Onboarding welcome banner ── */}
+        {isOnboarding && (
+          <div style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+            <div style={{ width: 42, height: 42, background: 'rgba(59,130,246,0.2)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Zap size={20} color="#3b82f6" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: '#f1f5f9', marginBottom: '0.3rem' }}>
+                Welcome! One last step to activate your account 🎉
+              </div>
+              <div style={{ fontSize: '0.87rem', color: '#94a3b8', lineHeight: 1.55 }}>
+                Choose a plan and complete your first payment to unlock your <strong style={{ color: '#f1f5f9' }}>14-day free trial</strong>.
+                You won&apos;t be charged again until the trial ends — and you can cancel anytime.
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={s.header}>
           <div style={s.headerIcon}><CreditCard size={22} color="#3b82f6" /></div>
@@ -282,5 +302,13 @@ export default function BillingPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense>
+      <BillingPageInner />
+    </Suspense>
   )
 }

@@ -30,8 +30,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
     }
 
-    // Check tenant is active or in trial
-    if (!isTenantActive({ status: user.tenant_status, trial_ends_at: user.trial_ends_at })) {
+    // Allow pending_payment tenants to log in so they can reach billing.
+    // Block only expired/cancelled/suspended tenants.
+    const blocked = ['suspended', 'cancelled']
+    const tenantExpired =
+      !isTenantActive({ status: user.tenant_status, trial_ends_at: user.trial_ends_at }) &&
+      user.tenant_status !== 'pending_payment'
+
+    if (blocked.includes(user.tenant_status) || tenantExpired) {
       return NextResponse.json({
         error: 'Your subscription has expired. Please renew to continue.',
         code: 'SUBSCRIPTION_EXPIRED',
@@ -44,7 +50,8 @@ export async function POST(req: NextRequest) {
       [user.id]
     )
 
-    const token = signToken({ userId: user.id, tenantId: user.tenant_id, role: user.role })
+    // Embed tenantStatus so the middleware can redirect without a DB call
+    const token = signToken({ userId: user.id, tenantId: user.tenant_id, role: user.role, tenantStatus: user.tenant_status })
 
     const response = NextResponse.json({
       success: true,

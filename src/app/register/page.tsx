@@ -52,7 +52,8 @@ function RegisterForm() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Registration failed'); setLoading(false); return }
-      router.push('/dashboard')
+      // Always redirect to billing — trial starts only after first payment
+      router.push('/billing?onboarding=1')
     } catch {
       setError('Network error. Please try again.'); setLoading(false)
     }

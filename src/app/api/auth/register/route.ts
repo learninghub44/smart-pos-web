@@ -36,16 +36,16 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(password)
     const slug = generateSlug(businessName)
 
-    // Trial: 14 days
-    const trialEndsAt = new Date()
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14)
+    // Trial starts ONLY after payment is confirmed.
+    // At registration the tenant is 'pending_payment'; trial_ends_at is set
+    // by the billing webhook once the first payment succeeds.
 
-    // Create tenant
+    // Create tenant with pending_payment status (no trial yet)
     const tenant = await queryOne<any>(`
       INSERT INTO tenants (business_name, slug, email, phone, plan_id, trial_ends_at, status)
-      VALUES ($1, $2, $3, $4, $5, $6, 'trial')
+      VALUES ($1, $2, $3, $4, $5, NULL, 'pending_payment')
       RETURNING *
-    `, [businessName.trim(), slug, emailLower, phone || null, plan, trialEndsAt.toISOString()])
+    `, [businessName.trim(), slug, emailLower, phone || null, plan])
 
     // Create default branch
     const branch = await queryOne<any>(`
@@ -77,17 +77,15 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ vat_rate: 16, enabled: false }),
     ])
 
-    // Sign JWT
-    const token = signToken({ userId: user.id, tenantId: tenant.id, role: user.role })
+    // Sign JWT — include tenantStatus so middleware can redirect without a DB call
+    const token = signToken({ userId: user.id, tenantId: tenant.id, role: user.role, tenantStatus: 'pending_payment' })
 
+    // Always send the user to billing first — trial activates after payment.
     const response = NextResponse.json({
       success: true,
       user: { id: user.id, name: user.name, email: user.email, role: user.role, tenant_id: tenant.id },
       tenant: { id: tenant.id, business_name: tenant.business_name, slug: tenant.slug, plan_id: plan },
-      trialEndsAt: trialEndsAt.toISOString(),
-      // If plan is NOT lifetime/paid, redirect to dashboard (trial)
-      // If paid plan selected, redirect to payment
-      requiresPayment: plan !== 'starter' || false,
+      requiresPayment: true, // always true — trial starts after first payment
     })
     response.headers.set('Set-Cookie', makeCookie(token))
     return response
