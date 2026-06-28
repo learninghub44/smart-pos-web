@@ -23,9 +23,11 @@ export function useBranch() {
 
   const loadBranches = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data } = await supabase.from('branches').select('*').eq('is_active', true).order('name')
-      if (data) setBranches(data)
+      const res = await fetch('/api/branches')
+      if (res.ok) {
+        const data = await res.json()
+        setBranches((data.data ?? data).filter((b: Branch) => b.is_active))
+      }
     } catch (_) {}
   }
 
@@ -40,7 +42,7 @@ export function useBranch() {
   return {
     user,
     owner,
-    activeBranchId,       // null = all branches (owner only)
+    activeBranchId,
     activeBranchName,
     branches,
     switchBranch,

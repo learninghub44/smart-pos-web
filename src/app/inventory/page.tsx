@@ -73,11 +73,10 @@ export default function InventoryPage() {
 
   const loadLookups = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
       const [{ data: cats }, { data: brs }, { data: sups }] = await Promise.all([
-        supabase.from('categories').select('*').order('name'),
-        supabase.from('brands').select('*').order('name'),
-        supabase.from('suppliers').select('*').order('name'),
+        fetch('/api/categories').then(r=>r.json()).then(j=>({data: j.data??j})),
+        fetch('/api/brands').then(r=>r.json()).then(j=>({data: j.data??j})),
+        fetch('/api/suppliers').then(r=>r.json()).then(j=>({data: j.data??j})),
       ])
       if (cats) { setCategories(cats); for (const c of cats) await addCategoryToDB(c) }
       if (brs) { setBrands(brs); for (const b of brs) await addBrandToDB(b) }
@@ -150,8 +149,8 @@ export default function InventoryPage() {
     const now = new Date().toISOString()
     const brand = { id, name, created_at: now, updated_at: now }
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { error } = await supabase.from('brands').insert(brand)
+      const res = await fetch('/api/brands', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(brand) })
+      const { error } = res.ok ? {} : { error: true }
       if (error) throw error
     } catch { /* offline — saved locally only below */ }
     await addBrandToDB(brand)
@@ -164,8 +163,8 @@ export default function InventoryPage() {
     const now = new Date().toISOString()
     const category = { id, name, parent_id: null, created_at: now, updated_at: now }
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { error } = await supabase.from('categories').insert(category)
+      const res = await fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(category) })
+      const { error } = res.ok ? {} : { error: true }
       if (error) throw error
     } catch { /* offline — saved locally only below */ }
     await addCategoryToDB(category)
@@ -203,9 +202,8 @@ export default function InventoryPage() {
 
   const loadProducts = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
       const branchId = getActiveBranchId()
-      let query = supabase.from('products').select('*').order('name', { ascending: true })
+      const params = new URLSearchParams({ order: 'name' })
       if (branchId) query = query.eq('branch_id', branchId)
       const { data, error } = await query
       if (data && !error) {
@@ -277,8 +275,7 @@ export default function InventoryPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this product? This cannot be undone.')) return
     try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('products').delete().eq('id', id)
+      await fetch('/api/products', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) })
     } catch {}
     await deleteProductFromDB(id)
     loadProducts()
@@ -297,20 +294,18 @@ export default function InventoryPage() {
     if (formData.stock && parseInt(formData.stock) < 0) 
       return setError('Stock cannot be negative')
 
-    // Check barcode uniqueness — check Supabase first, fall back to IndexedDB
+    // Check barcode uniqueness
     if (!editingProduct || editingProduct.barcode !== formData.barcode) {
       try {
-        const { supabase } = await import('@/lib/supabase')
-        const { data: existing } = await supabase
-          .from('products')
-          .select('id, name')
-          .eq('barcode', formData.barcode.trim())
-          .eq('archived', false)
-          .single()
-        if (existing && existing.id !== editingProduct?.id)
-          return setError(`Barcode already used by: ${existing.name}`)
+        const res = await fetch(`/api/products?barcode=${encodeURIComponent(formData.barcode.trim())}`)
+        if (res.ok) {
+          const json = await res.json()
+          const list: any[] = json.data ?? json
+          const existing = list.find((p: any) => p.barcode === formData.barcode.trim() && !p.archived)
+          if (existing && existing.id !== editingProduct?.id)
+            return setError(`Barcode already used by: ${existing.name}`)
+        }
       } catch {
-        // Offline: fall back to IndexedDB
         const existing = await getProductByBarcode(formData.barcode)
         if (existing && existing.id !== editingProduct?.id)
           return setError(`Barcode already used by: ${existing.name}`)
@@ -355,15 +350,14 @@ export default function InventoryPage() {
     }
 
     try {
-      const { supabase } = await import('@/lib/supabase')
       
       const tryInsert = async (data: any) => {
         if (editingProduct) {
-          const { error } = await supabase.from('products').update(data).eq('id', editingProduct.id)
+          const { error } = await fetch('/api/products', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...data, id: editingProduct.id}) }).then(r=>r.ok?{}:{error:true})
           return error
         } else {
           const id = crypto.randomUUID()
-          const { error } = await supabase.from('products').insert({ ...data, id, created_at: now })
+          const { error } = await fetch('/api/products', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...data, id, created_at: now}) }).then(r=>r.ok?{}:{error:true})
           if (!error) await addProductToDB({ ...data, id, created_at: now })
           return error
         }

@@ -1,4 +1,3 @@
-import { supabase } from './supabase'
 import {
   getUnsyncedSales,
   getUnsyncedActions,
@@ -21,103 +20,56 @@ import {
   updateSaleInDB,
 } from './indexeddb'
 
-export async function syncToSupabase() {
-  if (!navigator.onLine) {
-    console.log('Device is offline. Sync will happen when connection is restored.')
-    return { success: false, message: 'Device is offline' }
-  }
+async function api(path: string, method = 'GET', body?: any) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) throw new Error(`API ${method} ${path} failed: ${res.status}`)
+  const json = await res.json()
+  return json.data ?? json
+}
+
+export async function syncToServer() {
+  if (!navigator.onLine) return { success: false, message: 'Device is offline' }
 
   try {
     // Sync unsynced sales
     const unsyncedSales = await getUnsyncedSales()
-
     for (const sale of unsyncedSales) {
-      const { error } = await supabase.from('sales').upsert({
-        id: sale.id,
-        customer_id: sale.customer_id,
-        total_amount: sale.total_amount,
-        discount_amount: sale.discount_amount,
-        discount_type: sale.discount_type,
-        payment_method: sale.payment_method,
-        cash_amount: sale.cash_amount,
-        mpesa_amount: sale.mpesa_amount,
-        card_amount: sale.card_amount,
-        bank_amount: sale.bank_amount,
-        credit_amount: sale.credit_amount,
-        receipt_pin: sale.receipt_pin,
-        receipt_number: sale.receipt_number,
-        cashier_id: sale.cashier_id,
-        notes: sale.notes,
-        created_at: sale.created_at,
-        synced: true,
-      })
-
-      if (!error) {
+      try {
+        await api('/api/sales', 'POST', sale)
         await updateSaleInDB({ ...sale, synced: true })
-        console.log(`Sale ${sale.id} synced successfully`)
-      } else {
-        console.error(`Failed to sync sale ${sale.id}:`, error)
+      } catch (e) {
+        console.error(`Failed to sync sale ${sale.id}:`, e)
       }
     }
 
     // Sync offline queue actions
     const unsyncedActions = await getUnsyncedActions()
-
     for (const action of unsyncedActions) {
       try {
         switch (action.action_type) {
-          case 'add_product':
-            await supabase.from('products').insert(action.payload as any)
-            break
-          case 'update_product':
-            await supabase.from('products').update(action.payload as any).eq('id', (action.payload as any).id)
-            break
-          case 'delete_product':
-            await supabase.from('products').delete().eq('id', (action.payload as any).id)
-            break
-          case 'add_category':
-            await supabase.from('categories').insert(action.payload as any)
-            break
-          case 'update_category':
-            await supabase.from('categories').update(action.payload as any).eq('id', (action.payload as any).id)
-            break
-          case 'delete_category':
-            await supabase.from('categories').delete().eq('id', (action.payload as any).id)
-            break
-          case 'add_brand':
-            await supabase.from('brands').insert(action.payload as any)
-            break
-          case 'update_brand':
-            await supabase.from('brands').update(action.payload as any).eq('id', (action.payload as any).id)
-            break
-          case 'delete_brand':
-            await supabase.from('brands').delete().eq('id', (action.payload as any).id)
-            break
-          case 'add_customer':
-            await supabase.from('customers').insert(action.payload as any)
-            break
-          case 'update_customer':
-            await supabase.from('customers').update(action.payload as any).eq('id', (action.payload as any).id)
-            break
-          case 'delete_customer':
-            await supabase.from('customers').delete().eq('id', (action.payload as any).id)
-            break
-          case 'add_supplier':
-            await supabase.from('suppliers').insert(action.payload as any)
-            break
-          case 'update_supplier':
-            await supabase.from('suppliers').update(action.payload as any).eq('id', (action.payload as any).id)
-            break
-          case 'delete_supplier':
-            await supabase.from('suppliers').delete().eq('id', (action.payload as any).id)
-            break
-          default:
-            console.log(`Unknown action type: ${action.action_type}`)
+          case 'add_product':    await api('/api/products', 'POST', action.payload); break
+          case 'update_product': await api('/api/products', 'PUT', action.payload); break
+          case 'delete_product': await api('/api/products', 'DELETE', { id: (action.payload as any).id }); break
+          case 'add_category':    await api('/api/categories', 'POST', action.payload); break
+          case 'update_category': await api('/api/categories', 'PUT', action.payload); break
+          case 'delete_category': await api('/api/categories', 'DELETE', { id: (action.payload as any).id }); break
+          case 'add_brand':    await api('/api/brands', 'POST', action.payload); break
+          case 'update_brand': await api('/api/brands', 'PUT', action.payload); break
+          case 'delete_brand': await api('/api/brands', 'DELETE', { id: (action.payload as any).id }); break
+          case 'add_customer':    await api('/api/customers', 'POST', action.payload); break
+          case 'update_customer': await api('/api/customers', 'PUT', action.payload); break
+          case 'delete_customer': await api('/api/customers', 'DELETE', { id: (action.payload as any).id }); break
+          case 'add_supplier':    await api('/api/suppliers', 'POST', action.payload); break
+          case 'update_supplier': await api('/api/suppliers', 'PUT', action.payload); break
+          case 'delete_supplier': await api('/api/suppliers', 'DELETE', { id: (action.payload as any).id }); break
         }
-
         await markActionAsSynced(action.id)
-      } catch (error) {
-        console.error(`Failed to sync action ${action.id}:`, error)
+      } catch (e) {
+        console.error(`Failed to sync action ${action.id}:`, e)
       }
     }
 
@@ -128,6 +80,9 @@ export async function syncToSupabase() {
   }
 }
 
+// Keep old name as alias
+export const syncToSupabase = syncToServer
+
 async function upsertLocalRecords<T extends { id: string }>(
   localGetAll: () => Promise<T[]>,
   localAdd: (item: T) => Promise<any>,
@@ -136,85 +91,58 @@ async function upsertLocalRecords<T extends { id: string }>(
 ) {
   const existing = await localGetAll()
   const existingIds = new Set(existing.map(e => e.id))
-
   for (const item of remoteData) {
-    if (existingIds.has(item.id)) {
-      await localUpdate(item)
-    } else {
-      await localAdd(item)
-    }
+    if (existingIds.has(item.id)) await localUpdate(item)
+    else await localAdd(item)
   }
 }
 
-export async function syncFromSupabase() {
-  if (!navigator.onLine) {
-    return { success: false, message: 'Device is offline' }
-  }
+export async function syncFromServer() {
+  if (!navigator.onLine) return { success: false, message: 'Device is offline' }
 
   try {
-    // Sync products
-    const { data: products, error: productsError } = await supabase.from('products').select('*')
-    if (products && !productsError) {
-      await upsertLocalRecords(getAllProducts, addProductToDB, updateProductInDB, products)
-    }
+    const [products, categories, brands, customers, suppliers] = await Promise.allSettled([
+      api('/api/products'),
+      api('/api/categories'),
+      api('/api/brands'),
+      api('/api/customers'),
+      api('/api/suppliers'),
+    ])
 
-    // Sync categories
-    const { data: categories, error: categoriesError } = await supabase.from('categories').select('*')
-    if (categories && !categoriesError) {
-      await upsertLocalRecords(getAllCategories, addCategoryToDB, updateCategoryInDB, categories)
-    }
+    if (products.status === 'fulfilled') await upsertLocalRecords(getAllProducts, addProductToDB, updateProductInDB, products.value)
+    if (categories.status === 'fulfilled') await upsertLocalRecords(getAllCategories, addCategoryToDB, updateCategoryInDB, categories.value)
+    if (brands.status === 'fulfilled') await upsertLocalRecords(getAllBrands, addBrandToDB, updateBrandInDB, brands.value)
+    if (customers.status === 'fulfilled') await upsertLocalRecords(getAllCustomers, addCustomerToDB, updateCustomerInDB, customers.value)
+    if (suppliers.status === 'fulfilled') await upsertLocalRecords(getAllSuppliers, addSupplierToDB, updateSupplierInDB, suppliers.value)
 
-    // Sync brands
-    const { data: brands, error: brandsError } = await supabase.from('brands').select('*')
-    if (brands && !brandsError) {
-      await upsertLocalRecords(getAllBrands, addBrandToDB, updateBrandInDB, brands)
-    }
-
-    // Sync customers
-    const { data: customers, error: customersError } = await supabase.from('customers').select('*')
-    if (customers && !customersError) {
-      await upsertLocalRecords(getAllCustomers, addCustomerToDB, updateCustomerInDB, customers)
-    }
-
-    // Sync suppliers
-    const { data: suppliers, error: suppliersError } = await supabase.from('suppliers').select('*')
-    if (suppliers && !suppliersError) {
-      await upsertLocalRecords(getAllSuppliers, addSupplierToDB, updateSupplierInDB, suppliers)
-    }
-
-    return { success: true, message: 'Data synced from Supabase successfully' }
+    return { success: true, message: 'Data synced from server successfully' }
   } catch (error) {
-    console.error('Sync from Supabase error:', error)
-    return { success: false, message: 'Sync from Supabase failed' }
+    console.error('Sync from server error:', error)
+    return { success: false, message: 'Sync from server failed' }
   }
 }
+
+export const syncFromSupabase = syncFromServer
 
 export async function fullSync() {
   console.log('Starting full sync...')
-  const toSupabaseResult = await syncToSupabase()
-  const fromSupabaseResult = await syncFromSupabase()
-  return { toSupabase: toSupabaseResult, fromSupabase: fromSupabaseResult }
+  const toServer = await syncToServer()
+  const fromServer = await syncFromServer()
+  return { toSupabase: toServer, fromSupabase: fromServer }
 }
 
-// Set up automatic sync when connection is restored
 export function setupAutoSync() {
   window.addEventListener('online', async () => {
     console.log('Connection restored. Starting sync...')
     await fullSync()
   })
-
-  // Periodic sync every 5 minutes
   setInterval(async () => {
-    if (navigator.onLine) {
-      await fullSync()
-    }
+    if (navigator.onLine) await fullSync()
   }, 5 * 60 * 1000)
 }
 
-// Queue an action for offline sync
 export async function queueOfflineAction(actionType: string, payload: any) {
   const { addToOfflineQueue } = await import('./indexeddb')
-
   await addToOfflineQueue({
     id: crypto.randomUUID(),
     action_type: actionType,

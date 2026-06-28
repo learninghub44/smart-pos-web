@@ -16,15 +16,17 @@ export default function ReceiptsPage() {
   const [showCameraScanner, setShowCameraScanner] = useState(false)
   const [businessSettings, setBusinessSettings] = useState<any>(null)
 
-  useEffect(() => {
-    loadBusinessSettings()
-  }, [])
+  useEffect(() => { loadBusinessSettings() }, [])
 
   const loadBusinessSettings = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data } = await supabase.from('settings').select('*').eq('key', 'business').single()
-      if (data) { setBusinessSettings(data.value); return }
+      const res = await fetch('/api/settings')
+      if (res.ok) {
+        const json = await res.json()
+        const settings = json.data ?? json
+        if (settings?.business) { setBusinessSettings(settings.business); return }
+        if (settings) { setBusinessSettings(settings); return }
+      }
     } catch (_) {}
     try {
       const { getSettingByKey } = await import('@/lib/indexeddb')
@@ -39,74 +41,46 @@ export default function ReceiptsPage() {
     setShowCameraScanner(false)
   }
 
-  useBarcodeScanner({
-    onScan: handleReceiptScan,
-    enabled: !showReceipt && !showCameraScanner
-  })
+  useBarcodeScanner({ onScan: handleReceiptScan, enabled: !showReceipt && !showCameraScanner })
 
   const doSearch = async (pin: string) => {
     if (!pin.trim()) return
 
     try {
-      const { supabase } = await import('@/lib/supabase')
+      // Build query params
+      const params = new URLSearchParams()
+      if (searchType === 'receipt_pin') params.set('receipt_pin', pin.toUpperCase())
+      else if (searchType === 'receipt_number') params.set('receipt_number', pin.toUpperCase())
+      else if (searchType === 'customer_phone') params.set('customer_phone', pin)
+      else if (searchType === 'customer_name') params.set('customer_name', pin)
+      else if (searchType === 'sale_date') params.set('date', pin)
 
-      let query = supabase.from('sales').select('*')
+      const res = await fetch(`/api/sales?${params}`)
+      if (res.ok) {
+        const json = await res.json()
+        const list: any[] = json.data ?? json
+        const sale = list[0]
 
-      if (searchType === 'receipt_pin') {
-        query = query.eq('receipt_pin', pin.toUpperCase())
-      } else if (searchType === 'receipt_number') {
-        query = query.eq('receipt_number', pin.toUpperCase())
-      } else if (searchType === 'customer_phone') {
-        const { data: customers } = await supabase
-          .from('customers').select('id').eq('phone', pin).single()
-        if (customers) {
-          query = query.eq('customer_id', (customers as any).id)
-        } else {
-          alert('Customer not found'); return
-        }
-      } else if (searchType === 'customer_name') {
-        const { data: customers } = await supabase
-          .from('customers').select('id').ilike('name', `%${pin}%`)
-        if (customers && customers.length > 0) {
-          query = query.in('customer_id', customers.map((c: any) => c.id))
-        } else {
-          alert('Customer not found'); return
-        }
-      } else if (searchType === 'sale_date') {
-        query = query
-          .gte('created_at', `${pin}T00:00:00`)
-          .lte('created_at', `${pin}T23:59:59`)
-      }
+        if (sale) {
+          // Fetch sale items
+          const itemsRes = await fetch(`/api/sales/${sale.id}/items`)
+          let items: any[] = []
+          if (itemsRes.ok) {
+            const itemsJson = await itemsRes.json()
+            items = itemsJson.data ?? itemsJson
+          }
 
-      const { data: sale, error: saleError } = await query.single()
-
-      if (sale && !saleError) {
-        // Fetch cashier name from users table
-        let cashierName = 'Cashier'
-        if (sale.cashier_id) {
-          const { data: cashierData } = await supabase
-            .from('users').select('name').eq('id', sale.cashier_id).single()
-          if (cashierData) cashierName = (cashierData as any).name
-        }
-
-        setFoundSale({ ...sale, cashier_name: cashierName })
-
-        const { data: items, error: itemsError } = await supabase
-          .from('sale_items').select('*, products(name)').eq('sale_id', sale.id)
-
-        if (items && !itemsError) {
+          setFoundSale(sale)
           setSaleItems(items.map((item: any) => ({
             ...item,
-            name: item.products?.name || 'Unknown Product',
+            name: item.product_name || item.products?.name || 'Unknown Product',
             total: item.price * item.quantity
           })))
           setShowReceipt(true)
           return
         }
       }
-    } catch (_) {
-      console.log('Supabase not available, using IndexedDB')
-    }
+    } catch (_) {}
 
     // Fallback to IndexedDB
     const sale = await getSaleByReceiptPin(pin.toUpperCase())
@@ -130,17 +104,8 @@ export default function ReceiptsPage() {
   }
 
   const handleSearch = () => doSearch(searchPin)
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearch()
-  }
-
-  const clearSearch = () => {
-    setSearchPin('')
-    setFoundSale(null)
-    setSaleItems([])
-    setShowReceipt(false)
-  }
+  const handleKeyPress = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSearch() }
+  const clearSearch = () => { setSearchPin(''); setFoundSale(null); setSaleItems([]); setShowReceipt(false) }
 
   return (
     <div className="space-y-6">
@@ -153,11 +118,8 @@ export default function ReceiptsPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Search By</label>
-            <select
-              value={searchType}
-              onChange={(e) => setSearchType(e.target.value as any)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={searchType} onChange={(e) => setSearchType(e.target.value as any)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
               <option value="receipt_pin">Receipt PIN</option>
               <option value="receipt_number">Receipt Number</option>
               <option value="customer_phone">Customer Phone</option>
@@ -168,8 +130,7 @@ export default function ReceiptsPage() {
           <div className="flex space-x-4">
             <div className="flex-1 relative">
               <ReceiptIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
+              <input type="text"
                 placeholder={
                   searchType === 'receipt_pin' ? 'Enter Receipt PIN (e.g., POS-ABC123)' :
                   searchType === 'receipt_number' ? 'Enter Receipt Number' :
@@ -177,29 +138,15 @@ export default function ReceiptsPage() {
                   searchType === 'customer_name' ? 'Enter Customer Name' :
                   'Enter Sale Date (YYYY-MM-DD)'
                 }
-                value={searchPin}
-                onChange={(e) => setSearchPin(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+                value={searchPin} onChange={(e) => setSearchPin(e.target.value)} onKeyPress={handleKeyPress}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
             </div>
-            <button
-              onClick={() => setShowCameraScanner(true)}
-              className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
+            <button onClick={() => setShowCameraScanner(true)} className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
               <Camera className="h-5 w-5" />
             </button>
-            <button
-              onClick={handleSearch}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Search
-            </button>
+            <button onClick={handleSearch} className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Search</button>
             {searchPin && (
-              <button
-                onClick={clearSearch}
-                className="bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300"
-              >
+              <button onClick={clearSearch} className="bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300">
                 <X className="h-5 w-5" />
               </button>
             )}
@@ -210,8 +157,7 @@ export default function ReceiptsPage() {
       {showReceipt && foundSale && (
         <div className="bg-white rounded-xl shadow-sm p-6">
           <Receipt
-            sale={foundSale}
-            items={saleItems}
+            sale={foundSale} items={saleItems}
             shopName={businessSettings?.name || 'SMART POS'}
             shopAddress={businessSettings?.address || ''}
             shopPhone={businessSettings?.phone || ''}
@@ -235,12 +181,7 @@ export default function ReceiptsPage() {
       )}
 
       {showCameraScanner && (
-        <BarcodeScanner
-          onScan={handleReceiptScan}
-          onClose={() => setShowCameraScanner(false)}
-          continuous={false}
-          showFlashlight={true}
-        />
+        <BarcodeScanner onScan={handleReceiptScan} onClose={() => setShowCameraScanner(false)} continuous={false} showFlashlight={true} />
       )}
     </div>
   )

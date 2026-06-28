@@ -66,8 +66,7 @@ export default function InventoryCountPage() {
     for (const item of countItems) {
       if (item.countedStock !== item.systemStock) {
         try {
-          const { supabase } = await import('@/lib/supabase')
-          await supabase.from('products').update({ stock: item.countedStock }).eq('id', item.productId)
+          await fetch('/api/products', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: item.productId, stock: item.countedStock }) })
         } catch {}
         await updateProductInDB({ id: item.productId, stock: item.countedStock } as any)
       }

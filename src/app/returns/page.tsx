@@ -23,8 +23,7 @@ export default function ReturnsPage() {
 
   const loadReturns = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase.from('returns').select('*, return_items(*, products(*))').order('created_at', { ascending: false })
+      const res = await fetch('/api/returns'); const json = await res.json(); const data = json.data ?? json; const error = null
       if (data && !error) { setReturns(data); return }
     } catch {}
     const { getAllReturns } = await import('@/lib/indexeddb')
@@ -33,8 +32,7 @@ export default function ReturnsPage() {
 
   const loadSales = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase.from('sales').select('*, sale_items(*, products(*))').order('created_at', { ascending: false }).limit(50)
+      const res2 = await fetch('/api/sales?limit=50'); const json2 = await res2.json(); const data = json2.data ?? json2; const error = null
       if (data && !error) { setSales(data); return }
     } catch {}
     const { getAllSales } = await import('@/lib/indexeddb')
@@ -49,8 +47,7 @@ export default function ReturnsPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { error } = await supabase.from('returns').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', id)
+      const res = await fetch('/api/returns', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id, status: 'approved', approved_at: new Date().toISOString() }) }); const { error } = res.ok ? {} : { error: true }
       if (!error) { loadReturns(); return }
     } catch {}
     const { updateReturnInDB } = await import('@/lib/indexeddb')
@@ -60,8 +57,7 @@ export default function ReturnsPage() {
 
   const handleReject = async (id: string) => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { error } = await supabase.from('returns').update({ status: 'rejected' }).eq('id', id)
+      const res = await fetch('/api/returns', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id, status: 'rejected' }) }); const { error } = res.ok ? {} : { error: true }
       if (!error) { loadReturns(); return }
     } catch {}
     const { updateReturnInDB } = await import('@/lib/indexeddb')
@@ -73,8 +69,7 @@ export default function ReturnsPage() {
     e.preventDefault()
     const totalAmount = formData.items.reduce((s, i) => s + i.price * i.quantity, 0)
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data, error } = await supabase.from('returns').insert({ sale_id: formData.sale_id || null, reason: formData.reason, total_amount: totalAmount, status: 'pending' }).select().single()
+      const postRes = await fetch('/api/returns', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sale_id: formData.sale_id || null, reason: formData.reason, total_amount: totalAmount, status: 'pending' }) }); const postJson = await postRes.json(); const { data, error } = postRes.ok ? { data: postJson.data ?? postJson, error: null } : { data: null, error: true }
       if (data && !error) { loadReturns(); setShowModal(false); return }
     } catch {}
     const { addReturnToDB } = await import('@/lib/indexeddb')

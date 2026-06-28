@@ -57,10 +57,9 @@ export default function SettingsPage() {
 
   const loadStaff = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
       const [{ data: users }, { data: branchData }] = await Promise.all([
-        supabase.from('users').select('id,name,email,role,branch_id,created_at,branches(name)').order('created_at'),
-        supabase.from('branches').select('id,name').eq('is_active', true).order('name')
+        fetch('/api/settings/users').then(r=>r.json()).then(j=>({data: j.data??j})),
+        fetch('/api/branches').then(r=>r.json()).then(j=>({data: (j.data??j).filter((b:any)=>b.is_active)}))
       ])
       if (users) setStaffList(users)
       if (branchData) setBranches(branchData)
@@ -88,16 +87,14 @@ export default function SettingsPage() {
   const handleDeleteStaff = async (id: string, name: string) => {
     if (!confirm(`Remove ${name} from the system?`)) return
     try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('users').delete().eq('id', id)
+      await fetch('/api/settings/users', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) })
       loadStaff()
     } catch (_) {}
   }
 
   const loadSettings = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data } = await supabase.from('settings').select('*')
+      const settRes = await fetch('/api/settings'); const settJson = await settRes.json(); const data = Object.entries(settJson.data ?? settJson).map(([key, value]) => ({ key, value }))
       if (data && data.length > 0) {
         data.forEach((s: any) => {
           if (s.key === 'business') setBusinessSettings(s.value)
@@ -134,8 +131,7 @@ export default function SettingsPage() {
       else await addSettingToDB({ id: crypto.randomUUID(), key: 'payment_methods', value: methods, updated_at: now })
     } catch (_) {}
     try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('settings').upsert({ key: 'payment_methods', value: methods, updated_at: now }, { onConflict: 'key' })
+      await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'payment_methods', value: methods }) })
     } catch (_) {}
   }
 
@@ -179,7 +175,6 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      const { supabase } = await import('@/lib/supabase')
       const { addSettingToDB, updateSettingToDB, getAllSettings, getSettingByKey } = await import('@/lib/indexeddb')
       
       // Save business settings
@@ -238,7 +233,7 @@ export default function SettingsPage() {
       
       // Also save to Supabase
       try {
-        const { error: businessError } = await supabase
+        const businessRes = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'business', value: businessData }) }); const { error: businessError } = businessRes.ok ? {} : { error: true }; const _b = await businessRes
           .from('settings')
           .upsert({
             key: 'business',
@@ -246,7 +241,7 @@ export default function SettingsPage() {
             updated_at: new Date().toISOString()
           }, { onConflict: 'key' })
         
-        const { error: receiptError } = await supabase
+        const receiptRes = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'receipt', value: receiptData }) }); const { error: receiptError } = receiptRes.ok ? {} : { error: true }; const _r = await receiptRes
           .from('settings')
           .upsert({
             key: 'receipt',
@@ -254,7 +249,7 @@ export default function SettingsPage() {
             updated_at: new Date().toISOString()
           }, { onConflict: 'key' })
         
-        const { error: taxError } = await supabase
+        const taxRes = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'tax', value: taxData }) }); const { error: taxError } = taxRes.ok ? {} : { error: true }; const _t = await taxRes
           .from('settings')
           .upsert({
             key: 'tax',

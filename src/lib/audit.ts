@@ -9,7 +9,7 @@ export async function logAuditEvent(params: {
 }) {
   try {
     const user = await getCurrentAuthUser()
-    
+
     const auditLog = {
       id: crypto.randomUUID(),
       user_id: user?.id || null,
@@ -18,28 +18,21 @@ export async function logAuditEvent(params: {
       record_id: params.record_id || null,
       old_values: params.old_values || null,
       new_values: params.new_values || null,
-      ip_address: null, // Could be enhanced with real IP detection
+      ip_address: null,
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
       created_at: new Date().toISOString()
     }
-    
-    // Try to save to Supabase
+
+    // Save to Railway API
     try {
-      const { supabase } = await import('./supabase')
-      const { error } = await supabase
-        .from('audit_logs')
-        .insert(auditLog)
-      
-      if (!error) {
-        // Also save to IndexedDB for offline backup
-        const { addAuditLogToDB } = await import('./indexeddb')
-        await addAuditLogToDB(auditLog)
-        return
-      }
-    } catch (error) {
-      console.log('Supabase not available, using IndexedDB only')
-    }
-    
+      await fetch('/api/audit-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(auditLog),
+      })
+      return
+    } catch (_) {}
+
     // Fall back to IndexedDB only
     const { addAuditLogToDB } = await import('./indexeddb')
     await addAuditLogToDB(auditLog)
@@ -55,52 +48,25 @@ export async function getAuditLogs(filters?: {
   limit?: number
 }) {
   try {
-    const { supabase } = await import('./supabase')
-    let query = supabase
-      .from('audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (filters?.user_id) {
-      query = query.eq('user_id', filters.user_id)
+    const params = new URLSearchParams()
+    if (filters?.user_id) params.set('user_id', filters.user_id)
+    if (filters?.table_name) params.set('table_name', filters.table_name)
+    if (filters?.action) params.set('action', filters.action)
+    if (filters?.limit) params.set('limit', String(filters.limit))
+
+    const res = await fetch(`/api/audit-logs?${params}`)
+    if (res.ok) {
+      const json = await res.json()
+      return json.data ?? json
     }
-    if (filters?.table_name) {
-      query = query.eq('table_name', filters.table_name)
-    }
-    if (filters?.action) {
-      query = query.eq('action', filters.action)
-    }
-    if (filters?.limit) {
-      query = query.limit(filters.limit)
-    }
-    
-    const { data, error } = await query
-    
-    if (data && !error) {
-      return data
-    }
-  } catch (error) {
-    console.log('Supabase not available, using IndexedDB')
-  }
-  
+  } catch (_) {}
+
   // Fall back to IndexedDB
   const { getAllAuditLogs } = await import('./indexeddb')
-  const allLogs = await getAllAuditLogs()
-  
-  let filtered = allLogs
-  
-  if (filters?.user_id) {
-    filtered = filtered.filter(log => log.user_id === filters.user_id)
-  }
-  if (filters?.table_name) {
-    filtered = filtered.filter(log => log.table_name === filters.table_name)
-  }
-  if (filters?.action) {
-    filtered = filtered.filter(log => log.action === filters.action)
-  }
-  if (filters?.limit) {
-    filtered = filtered.slice(0, filters.limit)
-  }
-  
+  let filtered = await getAllAuditLogs()
+  if (filters?.user_id) filtered = filtered.filter(l => l.user_id === filters.user_id)
+  if (filters?.table_name) filtered = filtered.filter(l => l.table_name === filters.table_name)
+  if (filters?.action) filtered = filtered.filter(l => l.action === filters.action)
+  if (filters?.limit) filtered = filtered.slice(0, filters.limit)
   return filtered
 }

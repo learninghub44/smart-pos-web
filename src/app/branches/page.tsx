@@ -11,6 +11,16 @@ interface Branch {
 }
 interface BranchUser { id: string; name: string; email: string; role: string }
 
+async function apiBranch(method: string, body?: any) {
+  const res = await fetch('/api/branches', {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const json = await res.json()
+  return json.data ?? json
+}
+
 export default function BranchesPage() {
   const user = getCurrentAuthUser()
   const owner = isOwner(user)
@@ -25,18 +35,19 @@ export default function BranchesPage() {
 
   const loadBranches = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data } = await supabase.from('branches').select('*').order('created_at')
+      const data: Branch[] = await apiBranch('GET')
       if (data) {
         setBranches(data)
-        // Load users per branch
-        const { data: users } = await supabase.from('users').select('id,name,email,role,branch_id')
-        if (users) {
+        // Load users per branch via tenant_users API
+        const res = await fetch('/api/settings/users')
+        if (res.ok) {
+          const json = await res.json()
+          const users: BranchUser[] = json.data ?? json
           const map: Record<string, BranchUser[]> = {}
           for (const u of users) {
-            if (u.branch_id) {
-              if (!map[u.branch_id]) map[u.branch_id] = []
-              map[u.branch_id].push(u)
+            if ((u as any).branch_id) {
+              if (!map[(u as any).branch_id]) map[(u as any).branch_id] = []
+              map[(u as any).branch_id].push(u)
             }
           }
           setBranchUsers(map)
@@ -61,12 +72,11 @@ export default function BranchesPage() {
     e.preventDefault()
     setSaving(true)
     try {
-      const { supabase } = await import('@/lib/supabase')
       const payload = { name: form.name, location: form.location || null, phone: form.phone || null, email: form.email || null }
       if (editing) {
-        await supabase.from('branches').update(payload).eq('id', editing.id)
+        await apiBranch('PUT', { ...payload, id: editing.id })
       } else {
-        await supabase.from('branches').insert({ ...payload, is_active: true })
+        await apiBranch('POST', payload)
       }
       setShowModal(false)
       loadBranches()
@@ -76,8 +86,7 @@ export default function BranchesPage() {
 
   const toggleActive = async (b: Branch) => {
     try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('branches').update({ is_active: !b.is_active }).eq('id', b.id)
+      await apiBranch('PUT', { id: b.id, is_active: !b.is_active })
       loadBranches()
     } catch (_) {}
   }
@@ -85,8 +94,7 @@ export default function BranchesPage() {
   const handleDelete = async (b: Branch) => {
     if (!confirm(`Delete branch "${b.name}"? This cannot be undone.`)) return
     try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('branches').delete().eq('id', b.id)
+      await apiBranch('DELETE', { id: b.id })
       loadBranches()
     } catch (_) {}
   }
@@ -147,7 +155,6 @@ export default function BranchesPage() {
                 {b.email && <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" /><span>{b.email}</span></div>}
               </div>
 
-              {/* Staff assigned to this branch */}
               <div className="pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Users className="w-3.5 h-3.5 text-gray-400" />
