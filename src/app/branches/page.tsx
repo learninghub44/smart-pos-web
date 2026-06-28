@@ -22,8 +22,8 @@ async function apiBranch(method: string, body?: any) {
 }
 
 export default function BranchesPage() {
-  const user = getCurrentAuthUser()
-  const owner = isOwner(user)
+  const [user, setUser] = useState<import('@/lib/auth').User | null>(null)
+  const [owner, setOwner] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchUsers, setBranchUsers] = useState<Record<string, BranchUser[]>>({})
   const [showModal, setShowModal] = useState(false)
@@ -31,7 +31,10 @@ export default function BranchesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', location: '', phone: '', email: '' })
 
-  useEffect(() => { loadBranches() }, [])
+  useEffect(() => {
+    getCurrentAuthUser().then(u => { setUser(u); setOwner(isOwner(u)) })
+    loadBranches()
+  }, [])
 
   const loadBranches = async () => {
     try {

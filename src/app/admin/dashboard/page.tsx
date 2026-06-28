@@ -49,6 +49,8 @@ export default function AdminDashboard() {
     router.push('/admin')
   }
 
+  const badge = (color: string): React.CSSProperties => ({ padding: '0.2rem 0.5rem', borderRadius: 4, fontSize: '0.72rem', fontWeight: 700, background: `${color}20`, color })
+
   const s: Record<string, React.CSSProperties> = {
     page: { minHeight: '100vh', background: '#0a0f1e', color: '#f1f5f9', fontFamily: 'system-ui, sans-serif' },
     topbar: { background: '#111827', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '0 1.5rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 10 },
@@ -70,7 +72,6 @@ export default function AdminDashboard() {
     card: { background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '1.25rem' },
     cardTitle: { fontSize: '0.88rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 7, color: '#e2e8f0' },
     row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' },
-    badge: (color: string) => ({ padding: '0.2rem 0.5rem', borderRadius: 4, fontSize: '0.72rem', fontWeight: 700, background: `${color}20`, color }) as React.CSSProperties,
   }
 
   const statusColor: Record<string, string> = {
@@ -199,7 +200,7 @@ export default function AdminDashboard() {
                     <td style={{ padding: '0.6rem 0.75rem', color: '#64748b' }}>{t.email}</td>
                     <td style={{ padding: '0.6rem 0.75rem' }}>{t.plan_name}</td>
                     <td style={{ padding: '0.6rem 0.75rem' }}>
-                      <span style={s.badge(statusColor[t.status] || '#64748b')}>{t.status}</span>
+                      <span style={badge(statusColor[t.status] || '#64748b')}>{t.status}</span>
                     </td>
                     <td style={{ padding: '0.6rem 0.75rem', color: '#64748b' }}>
                       {new Date(t.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}

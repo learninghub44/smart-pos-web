@@ -52,13 +52,13 @@ export default function DashboardPage() {
             {((stats.lowStock||0)>0 || (stats.outOfStock||0)>0) && (
               <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
                 {(stats.lowStock||0)>0 && (
-                  <Link href="/inventory" style={{ display:'flex', alignItems:'center', gap:8, textDecoration:'none' }} className="alert alert-warning" style={{ display:'flex', alignItems:'center', gap:8, marginBottom:0 }}>
+                  <Link href="/inventory" className="alert alert-warning" style={{ display:'flex', alignItems:'center', gap:8, marginBottom:0, textDecoration:'none' }}>
                     <AlertTriangle size={13}/> {stats.lowStock} products low on stock — click to restock
                     <ArrowRight size={12}/>
                   </Link>
                 )}
                 {(stats.outOfStock||0)>0 && (
-                  <Link href="/inventory" style={{ display:'flex', alignItems:'center', gap:8, textDecoration:'none' }} className="alert alert-error" style={{ display:'flex', alignItems:'center', gap:8, marginBottom:0 }}>
+                  <Link href="/inventory" className="alert alert-error" style={{ display:'flex', alignItems:'center', gap:8, marginBottom:0, textDecoration:'none' }}>
                     <AlertTriangle size={13}/> {stats.outOfStock} items out of stock
                     <ArrowRight size={12}/>
                   </Link>

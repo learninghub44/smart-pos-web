@@ -204,12 +204,16 @@ export default function InventoryPage() {
     try {
       const branchId = getActiveBranchId()
       const params = new URLSearchParams({ order: 'name' })
-      if (branchId) query = query.eq('branch_id', branchId)
-      const { data, error } = await query
-      if (data && !error) {
-        setProducts(data)
-        await syncProductsFromSupabase(data)
-        return
+      if (branchId) params.set('branch_id', branchId)
+      const res = await fetch(`/api/products?${params}`)
+      if (res.ok) {
+        const json = await res.json()
+        const data = json.data ?? json
+        if (Array.isArray(data)) {
+          setProducts(data)
+          await syncProductsFromSupabase(data)
+          return
+        }
       }
     } catch {}
     const all = await getAllProducts()

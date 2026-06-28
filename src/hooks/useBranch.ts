@@ -12,10 +12,14 @@ export interface Branch {
 }
 
 export function useBranch() {
-  const user = getCurrentAuthUser()
+  const [user, setUser] = useState<import('@/lib/auth').User | null>(null)
   const [activeBranchId, setLocalBranchId] = useState<string | null>(() => getActiveBranchId())
   const [branches, setBranches] = useState<Branch[]>([])
   const owner = isOwner(user)
+
+  useEffect(() => {
+    getCurrentAuthUser().then(setUser)
+  }, [])
 
   useEffect(() => {
     if (owner) loadBranches()

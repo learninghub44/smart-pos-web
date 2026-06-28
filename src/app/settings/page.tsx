@@ -69,17 +69,28 @@ export default function SettingsPage() {
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault()
     setSavingStaff(true)
-    const result = await register(
-      staffForm.name, staffForm.email, staffForm.password,
-      staffForm.role as 'admin' | 'cashier',
-      staffForm.branch_id || null
-    )
-    if (result.success) {
-      setShowStaffModal(false)
-      setStaffForm({ name: '', email: '', password: '', role: 'cashier', branch_id: '' })
-      loadStaff()
-    } else {
-      alert(result.error || 'Failed to add staff')
+    try {
+      const res = await fetch('/api/settings/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: staffForm.name,
+          email: staffForm.email,
+          password: staffForm.password,
+          role: staffForm.role,
+          branch_id: staffForm.branch_id || null,
+        }),
+      })
+      const result = await res.json()
+      if (res.ok && result.success !== false) {
+        setShowStaffModal(false)
+        setStaffForm({ name: '', email: '', password: '', role: 'cashier', branch_id: '' })
+        loadStaff()
+      } else {
+        alert(result.error || 'Failed to add staff')
+      }
+    } catch {
+      alert('Failed to add staff')
     }
     setSavingStaff(false)
   }
@@ -231,31 +242,11 @@ export default function SettingsPage() {
         })
       }
       
-      // Also save to Supabase
+      // Also save to API
       try {
-        const businessRes = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'business', value: businessData }) }); const { error: businessError } = businessRes.ok ? {} : { error: true }; const _b = await businessRes
-          .from('settings')
-          .upsert({
-            key: 'business',
-            value: businessSettings,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'key' })
-        
-        const receiptRes = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'receipt', value: receiptData }) }); const { error: receiptError } = receiptRes.ok ? {} : { error: true }; const _r = await receiptRes
-          .from('settings')
-          .upsert({
-            key: 'receipt',
-            value: receiptSettings,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'key' })
-        
-        const taxRes = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'tax', value: taxData }) }); const { error: taxError } = taxRes.ok ? {} : { error: true }; const _t = await taxRes
-          .from('settings')
-          .upsert({
-            key: 'tax',
-            value: taxSettings,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'key' })
+        await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'business', value: businessSettings }) })
+        await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'receipt', value: receiptSettings }) })
+        await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'tax', value: taxSettings }) })
       } catch (error) {
         console.log('Supabase sync failed, settings saved locally')
       }

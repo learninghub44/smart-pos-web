@@ -109,6 +109,8 @@ export default function AdminTenantsPage() {
     router.push('/admin')
   }
 
+  const badge = (color: string): React.CSSProperties => ({ padding: '0.2rem 0.5rem', borderRadius: 4, fontSize: '0.72rem', fontWeight: 700, background: `${color}20`, color, display: 'inline-flex', alignItems: 'center', gap: 4 })
+
   const s: Record<string, React.CSSProperties> = {
     page: { minHeight: '100vh', background: '#0a0f1e', color: '#f1f5f9', fontFamily: 'system-ui, sans-serif' },
     topbar: { background: '#111827', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '0 1.5rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 10 },
@@ -125,7 +127,6 @@ export default function AdminTenantsPage() {
     table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: '0.83rem' },
     th: { textAlign: 'left' as const, padding: '0.625rem 0.875rem', color: '#64748b', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' as const, letterSpacing: '0.04em', borderBottom: '1px solid rgba(255,255,255,0.08)', background: '#0f172a' },
     td: { padding: '0.7rem 0.875rem', borderBottom: '1px solid rgba(255,255,255,0.04)' },
-    badge: (color: string) => ({ padding: '0.2rem 0.5rem', borderRadius: 4, fontSize: '0.72rem', fontWeight: 700, background: `${color}20`, color, display: 'inline-flex', alignItems: 'center', gap: 4 }) as React.CSSProperties,
     logoutBtn: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', borderRadius: 8, padding: '0.4rem 0.875rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 },
     // Modal
     overlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' },
@@ -221,7 +222,7 @@ export default function AdminTenantsPage() {
                         <td style={{ ...s.td, color: '#64748b', fontSize: '0.8rem' }}>{t.email}</td>
                         <td style={s.td}>{t.plan_name}</td>
                         <td style={s.td}>
-                          <span style={s.badge(statusColor[t.status] || '#64748b')}>
+                          <span style={badge(statusColor[t.status] || '#64748b')}>
                             <StatusIcon size={10} />
                             {t.status}
                           </span>

@@ -5,7 +5,7 @@ import { useReactToPrint } from 'react-to-print'
 
 interface ReceiptProps {
   sale: any
-  items: any[]
+  items?: any[]
   products?: any[]
   shopName?: string
   shopAddress?: string
@@ -14,11 +14,12 @@ interface ReceiptProps {
   cashierName?: string
   receiptFooter?: string
   change?: number
+  onClose?: () => void
 }
 
 export default function Receipt({
   sale,
-  items,
+  items = [],
   products = [],
   shopName = 'SMART POS',
   shopAddress = '',
