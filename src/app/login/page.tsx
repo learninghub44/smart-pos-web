@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { login, getRememberedBrand } from '@/lib/auth'
 import {
-  Eye, EyeOff, ArrowRight, ShoppingCart,
+  Eye, EyeOff, ArrowRight,
   Smartphone, GitBranch, CreditCard, Printer,
   Star, AlertCircle
 } from 'lucide-react'
@@ -64,15 +64,27 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <div style={{ width: 48, height: 48, background: brand?.logo_url ? '#fff' : '#e8891a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(232,137,26,0.4)', overflow: 'hidden' }}>
-            {brand?.logo_url
-              ? <img src={brand.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
-              : <ShoppingCart size={22} color="#fff" strokeWidth={2.2} />}
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.02em' }}>{brand?.business_name || 'Smart POS'}</div>
-            <div style={{ fontSize: 10, color: '#e8891a', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>{brand?.business_name ? 'Powered by Smart POS' : 'by Zetu Business Solutions'}</div>
-          </div>
+          {brand?.logo_url ? (
+            <>
+              <div style={{ width: 48, height: 48, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(232,137,26,0.4)', overflow: 'hidden' }}>
+                <img src={brand.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.02em' }}>{brand.business_name}</div>
+                <div style={{ fontSize: 10, color: '#e8891a', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>Powered by Smart POS</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ background: '#fff', borderRadius: 10, padding: 6, display: 'inline-flex', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
+                <img src="/logo-zetu-icon.png" alt="POS Zetu" style={{ height: 34, width: 'auto' }} />
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.02em' }}>POS ZETU</div>
+                <div style={{ fontSize: 10, color: '#4d9fff', fontWeight: 600, letterSpacing: '0.08em', fontFamily: "'Inter', sans-serif" }}>poszetupos.co.ke</div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Main copy */}
@@ -126,15 +138,25 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="mobile-logo" style={{ alignItems: 'center', gap: 10, marginBottom: 40 }}>
-            <div style={{ width: 40, height: 40, background: brand?.logo_url ? '#fff' : '#e8891a', border: brand?.logo_url ? '1px solid #f0f4fd' : 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {brand?.logo_url
-                ? <img src={brand.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 3 }} />
-                : <ShoppingCart size={18} color="#fff" strokeWidth={2.2} />}
-            </div>
-            <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>{brand?.business_name || 'Smart POS'}</div>
-              <div style={{ fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>{brand?.business_name ? 'Powered by Smart POS' : 'by Zetu Business Solutions'}</div>
-            </div>
+            {brand?.logo_url ? (
+              <>
+                <div style={{ width: 40, height: 40, background: '#fff', border: '1px solid #f0f4fd', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <img src={brand.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 3 }} />
+                </div>
+                <div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>{brand.business_name}</div>
+                  <div style={{ fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>Powered by Smart POS</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <img src="/logo-zetu-icon.png" alt="POS Zetu" style={{ height: 32, width: 'auto' }} />
+                <div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>POS ZETU</div>
+                  <div style={{ fontSize: 9.5, color: '#1d6fe0', fontWeight: 600, letterSpacing: '0.06em', fontFamily: "'Inter', sans-serif" }}>poszetupos.co.ke</div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Heading */}

@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  Eye, EyeOff, ArrowRight, ShoppingCart, Check,
+  Eye, EyeOff, ArrowRight, Check,
   CheckCircle, AlertCircle, Zap, Shield, Users
 } from 'lucide-react'
 
@@ -88,12 +88,12 @@ function RegisterForm() {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <div style={{ width: 48, height: 48, background: '#e8891a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(232,137,26,0.4)' }}>
-            <ShoppingCart size={22} color="#fff" strokeWidth={2.2} />
+          <div style={{ background: '#fff', borderRadius: 10, padding: 6, display: 'inline-flex', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
+            <img src="/logo-zetu-icon.png" alt="POS Zetu" style={{ height: 32, width: 'auto' }} />
           </div>
           <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 20, color: '#fff', letterSpacing: '-0.02em' }}>Smart POS</div>
-            <div style={{ fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif" }}>by Zetu Business Solutions</div>
+            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 20, color: '#fff', letterSpacing: '-0.02em' }}>POS ZETU</div>
+            <div style={{ fontSize: 9.5, color: '#4d9fff', fontWeight: 600, letterSpacing: '0.08em', fontFamily: "'Inter', sans-serif" }}>poszetupos.co.ke</div>
           </div>
         </div>
 
@@ -161,12 +161,10 @@ function RegisterForm() {
 
           {/* Mobile logo */}
           <div className="mobile-logo" style={{ alignItems: 'center', gap: 10, marginBottom: 32 }}>
-            <div style={{ width: 38, height: 38, background: '#e8891a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShoppingCart size={17} color="#fff" strokeWidth={2.2} />
-            </div>
+            <img src="/logo-zetu-icon.png" alt="POS Zetu" style={{ height: 30, width: 'auto' }} />
             <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>Smart POS</div>
-              <div style={{ fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>by Zetu Business Solutions</div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', letterSpacing: '-0.01em' }}>POS ZETU</div>
+              <div style={{ fontSize: 9.5, color: '#1d6fe0', fontWeight: 600, letterSpacing: '0.06em' }}>poszetupos.co.ke</div>
             </div>
           </div>
 

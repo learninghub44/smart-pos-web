@@ -209,12 +209,10 @@ export default function Landing() {
       <nav style={{ background: '#fff', borderBottom: '1px solid #f0f4fd', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 20px rgba(26,58,107,0.06)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', height: 68, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #1a3a6b, #2a5298)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(26,58,107,0.25)' }}>
-              <ShoppingCart size={18} color="#e8891a" strokeWidth={2.2} />
-            </div>
+            <img src="/logo-zetu-icon.png" alt="POS Zetu" style={{ height: 36, width: 'auto' }} />
             <div>
-              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>Smart POS</div>
-              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 9.5, color: '#e8891a', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>by Zetu Business Solutions</div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#1a3a6b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>POS ZETU</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 9.5, color: '#1d6fe0', fontWeight: 600, letterSpacing: '0.05em' }}>poszetupos.co.ke</div>
             </div>
           </div>
 
@@ -585,12 +583,12 @@ export default function Landing() {
         <div className="footer-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '60px 24px 40px', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '3rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 38, height: 38, background: '#e8891a', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShoppingCart size={17} color="#fff" strokeWidth={2.2} />
+              <div style={{ background: '#fff', borderRadius: 7, padding: 6, display: 'inline-flex', alignItems: 'center' }}>
+                <img src="/logo-zetu-icon.png" alt="POS Zetu" style={{ height: 30, width: 'auto' }} />
               </div>
               <div>
-                <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: '-0.01em' }}>Smart POS</div>
-                <div style={{ fontSize: 9.5, color: '#e8891a', fontFamily: "'Inter', sans-serif", fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>by Zetu Business Solutions</div>
+                <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: '-0.01em' }}>POS ZETU</div>
+                <div style={{ fontSize: 9.5, color: '#4d9fff', fontFamily: "'Inter', sans-serif", fontWeight: 600, letterSpacing: '0.05em' }}>poszetupos.co.ke</div>
               </div>
             </div>
             <p style={{ fontSize: 13.5, color: '#6b8ab0', lineHeight: 1.75, maxWidth: 280 }}>
