@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { verifyPassword, signToken, makeCookie, isTenantActive } from '@/lib/tenant-auth'
+import { isRateLimited, getClientIp } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
+  // Rate limit: max 10 login attempts per IP per 15 minutes
+  const ip = getClientIp(req)
+  if (isRateLimited(`login:${ip}`, 10, 15 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
+      { status: 429 }
+    )
+  }
+
   try {
-    const { email, password } = await req.json()
+    const body = await req.json()
+    const email    = typeof body.email    === 'string' ? body.email.trim().toLowerCase()  : ''
+    const password = typeof body.password === 'string' ? body.password                    : ''
+
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
+    if (email.length > 254 || password.length > 256) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 400 })
+    }
 
-    const emailLower = email.trim().toLowerCase()
-
-    // Find user with tenant info
     const user = await queryOne<any>(`
       SELECT tu.*, t.status as tenant_status, t.plan_id, t.business_name,
              t.trial_ends_at, t.currency, t.logo_url, b.name as branch_name
@@ -19,19 +32,16 @@ export async function POST(req: NextRequest) {
       JOIN tenants t ON t.id = tu.tenant_id
       LEFT JOIN branches b ON b.id = tu.branch_id
       WHERE tu.email = $1 AND tu.is_active = true
-    `, [emailLower])
+    `, [email])
 
-    if (!user) {
-      return NextResponse.json({ error: 'No account found with this email' }, { status: 401 })
+    // Constant-time: always verify even when user is null to prevent timing attacks
+    const hash = user?.password_hash || '$2a$12$invalidhashpaddingtomakethiswork123456789012345678'
+    const valid = await verifyPassword(password, hash)
+
+    if (!user || !valid) {
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    const valid = await verifyPassword(password, user.password_hash)
-    if (!valid) {
-      return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
-    }
-
-    // Allow pending_payment tenants to log in so they can reach billing.
-    // Block only expired/cancelled/suspended tenants.
     const blocked = ['suspended', 'cancelled']
     const tenantExpired =
       !isTenantActive({ status: user.tenant_status, trial_ends_at: user.trial_ends_at }) &&
@@ -44,14 +54,17 @@ export async function POST(req: NextRequest) {
       }, { status: 403 })
     }
 
-    // Update last login
     await queryOne(
       'UPDATE tenant_users SET last_login_at = NOW() WHERE id = $1',
       [user.id]
     )
 
-    // Embed tenantStatus so the middleware can redirect without a DB call
-    const token = signToken({ userId: user.id, tenantId: user.tenant_id, role: user.role, tenantStatus: user.tenant_status })
+    const token = signToken({
+      userId: user.id,
+      tenantId: user.tenant_id,
+      role: user.role,
+      tenantStatus: user.tenant_status,
+    })
 
     const response = NextResponse.json({
       success: true,

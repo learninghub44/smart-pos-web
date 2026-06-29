@@ -1,21 +1,48 @@
 'use client'
 
 import { useState } from 'react'
-import { Phone, MessageCircle, HelpCircle, Clock } from 'lucide-react'
+import { Phone, MessageCircle, HelpCircle, Clock, ChevronDown, ChevronUp, CheckCircle, ArrowRight, Mail } from 'lucide-react'
 
-const PHONE = '+254701059192'
-const WA_NUMBER = '254701059192'
+const PHONE      = '+254 701 059 192'
+const WA_NUMBER  = '254701059192'
+const EMAIL      = 'support@zetubusiness.co.ke'
 
-const FAQ = [
-  { q: 'How do I upgrade my plan?', a: 'Go to Billing & Subscription from the sidebar, choose a plan, and pay via M-Pesa. Your plan upgrades instantly on payment confirmation.' },
-  { q: 'My M-Pesa payment went through but my plan didn\'t upgrade', a: 'This usually resolves within 5 minutes. If not, send us the M-Pesa confirmation SMS reference via WhatsApp and we\'ll fix it immediately.' },
-  { q: 'How do I add more branches or users?', a: 'Upgrade to a higher plan. Go to Billing → choose Business or Enterprise plan.' },
-  { q: 'Can I get a receipt or invoice for my payment?', a: 'Yes. All payments appear under Billing → Payment History. Contact support for a formal VAT invoice.' },
-  { q: 'How do I reset a staff member\'s password?', a: 'Go to Settings → Staff, click on the staff member, and use the Reset Password option.' },
-  { q: 'Can I export my sales data?', a: 'Yes. Go to Reports, filter by date range, and use the Export button to download a CSV.' },
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: 'How do I upgrade my plan?',
+    a: 'Go to Billing from the sidebar, choose the plan that fits your business, and pay via M-Pesa. Your account upgrades the moment payment is confirmed.',
+  },
+  {
+    q: 'My M-Pesa payment went through but my plan did not upgrade.',
+    a: 'This usually resolves within 5 minutes. If it does not, send the M-Pesa confirmation SMS reference via WhatsApp and we will fix it immediately.',
+  },
+  {
+    q: 'How do I add more branches or staff accounts?',
+    a: 'Upgrade to the Business or Enterprise plan under Billing. Once upgraded, go to Settings to add branches and staff.',
+  },
+  {
+    q: 'Can I get a VAT invoice for my payment?',
+    a: 'Yes. All payments appear under Billing. Contact support via WhatsApp or email to request a formal VAT invoice — we send it within one business day.',
+  },
+  {
+    q: 'How do I reset a staff member password?',
+    a: 'Go to Settings, open the Staff tab, click the staff member, and use the Reset Password option. They will receive a new temporary password.',
+  },
+  {
+    q: 'Can I export my sales data?',
+    a: 'Yes. Open Reports, set your date range, then click Export to download a CSV file you can open in Excel or Google Sheets.',
+  },
+  {
+    q: 'Does Smart POS work without internet?',
+    a: 'Yes. The POS screen works offline and syncs automatically when your connection is restored. Reports and settings require an active connection.',
+  },
+  {
+    q: 'How do I connect a thermal receipt printer?',
+    a: 'Smart POS supports USB and Bluetooth thermal printers. From the POS screen, click the printer icon and follow the pairing steps. 58mm and 80mm paper widths are both supported.',
+  },
 ]
 
-const TICKET_CATEGORIES = [
+const CATEGORIES = [
   { value: 'billing',   label: 'Billing & Payments' },
   { value: 'technical', label: 'Technical Issue' },
   { value: 'account',   label: 'Account Access' },
@@ -23,206 +50,314 @@ const TICKET_CATEGORIES = [
   { value: 'other',     label: 'Other' },
 ]
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  border: '1px solid var(--border-md)',
-  padding: '7px 10px',
-  fontSize: 13,
-  color: 'var(--txt-1)',
-  background: 'var(--surface)',
-  outline: 'none',
-  boxSizing: 'border-box',
-  fontFamily: 'inherit',
-}
-
 export default function SupportPage() {
-  const [form, setForm]           = useState({ name: '', email: '', category: 'billing', message: '' })
+  const [form, setForm]       = useState({ name: '', email: '', category: 'billing', message: '' })
   const [submitted, setSubmitted] = useState(false)
-  const [openFaq, setOpenFaq]     = useState<number | null>(null)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [msgError, setMsgError] = useState(false)
 
-  const buildWhatsAppMessage = () => {
-    const lines = [
-      `*Smart POS Support Ticket*`, ``,
-      `*Name:* ${form.name || 'Not provided'}`,
-      `*Email:* ${form.email || 'Not provided'}`,
-      `*Category:* ${TICKET_CATEGORIES.find(c => c.value === form.category)?.label || form.category}`,
-      ``, `*Issue:*`, form.message,
-    ]
-    return encodeURIComponent(lines.join('\n'))
+  const set = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }))
+
+  const buildWaMessage = () => {
+    const cat = CATEGORIES.find(c => c.value === form.category)?.label || form.category
+    return encodeURIComponent(
+      `*Smart POS Support Ticket*\n\nName: ${form.name || 'Not provided'}\nEmail: ${form.email || 'Not provided'}\nCategory: ${cat}\n\nIssue:\n${form.message}`
+    )
   }
 
-  const handleSubmit = () => {
-    if (!form.message.trim()) return
-    window.open(`https://wa.me/${WA_NUMBER}?text=${buildWhatsAppMessage()}`, '_blank')
+  const handleSend = () => {
+    if (!form.message.trim()) { setMsgError(true); return }
+    setMsgError(false)
+    window.open(`https://wa.me/${WA_NUMBER}?text=${buildWaMessage()}`, '_blank')
     setSubmitted(true)
   }
 
   return (
-    <div style={{ padding: '16px 20px' }}>
-
-      {/* ── Toolbar / title row ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-        <HelpCircle size={15} color="var(--xl-green)" />
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt-1)' }}>Customer Support</span>
-        <span style={{ fontSize: 13, color: 'var(--txt-3)', marginLeft: 4 }}>— reach us by phone or WhatsApp, Mon–Sat 8am–8pm EAT</span>
+    <div className="xl-page">
+      {/* Toolbar */}
+      <div className="xl-toolbar">
+        <span className="xl-toolbar-title">Support</span>
+        <div className="xl-toolbar-sep" />
+        <span style={{ fontSize: 12, color: 'var(--txt-3)', fontWeight: 500 }}>
+          Mon–Sat, 8am–8pm EAT
+        </span>
       </div>
 
-      {/* ── Main grid: left col + right col ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, alignItems: 'start' }}>
+      <div className="xl-page-inner" style={{ maxWidth: 1100 }}>
 
-        {/* ══ LEFT COLUMN ══ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* Contact card */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            {/* Card header */}
-            <div style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Phone size={13} color="var(--txt-2)" />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-1)' }}>Call or WhatsApp</span>
+        {/* ── Hero strip ───────────────────────────────── */}
+        <div style={{
+          background: 'var(--sidebar-bg)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '32px 36px',
+          marginBottom: 28,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 24,
+          flexWrap: 'wrap',
+        }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: 'rgba(255,255,255,.4)', marginBottom: 8 }}>
+              Zetu Business Solutions
             </div>
-
-            <div style={{ padding: '16px 14px' }}>
-              {/* Phone number */}
-              <div style={{ textAlign: 'center', marginBottom: 14 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--txt-1)', letterSpacing: '0.01em' }}>{PHONE}</div>
-                <div style={{ fontSize: 12, color: 'var(--txt-3)', marginTop: 2 }}>Zetu Business Solutions · Kenya</div>
-              </div>
-
-              {/* Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <a href={`tel:${PHONE}`} style={{ textDecoration: 'none' }}>
-                  <button style={{ width: '100%', padding: '9px 0', background: 'var(--blue-lt)', border: '1px solid var(--blue)', color: 'var(--blue-dk)', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: 'inherit' }}>
-                    <Phone size={14} /> Call Now
-                  </button>
-                </a>
-                <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                  <button style={{ width: '100%', padding: '9px 0', background: '#e6f9ee', border: '1px solid #25D366', color: '#0d6e38', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: 'inherit' }}>
-                    <MessageCircle size={14} /> Open WhatsApp Chat
-                  </button>
-                </a>
-              </div>
-
-              {/* Hours */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10, fontSize: 12, color: 'var(--txt-3)', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                <Clock size={12} /> Mon–Sat, 8am–8pm EAT
-              </div>
-            </div>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-0.025em', marginBottom: 8, lineHeight: 1.2 }}>
+              How can we help you?
+            </h1>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,.55)', lineHeight: 1.6, maxWidth: 420 }}>
+              We respond to WhatsApp within 30 minutes during business hours. For urgent issues, call directly.
+            </p>
           </div>
-
-          {/* Response times */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <div style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', padding: '6px 12px' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-1)' }}>Response Times</span>
-            </div>
-            <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {[
-                { color: '#25D366', label: 'WhatsApp', time: 'Under 30 minutes', icon: MessageCircle },
-                { color: 'var(--blue)', label: 'Phone call', time: 'Immediate during hours', icon: Phone },
-              ].map(({ color, label, time, icon: Icon }, i) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i === 0 ? '1px solid var(--border)' : 'none' }}>
-                  <Icon size={16} color={color} style={{ flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt-1)' }}>{label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--txt-3)' }}>Response time: {time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <a href={`tel:${PHONE}`} style={{ textDecoration: 'none' }}>
+              <button style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 'var(--radius)',
+                background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.15)',
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+                <Phone size={14} /> Call Now
+              </button>
+            </a>
+            <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <button style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 'var(--radius)',
+                background: '#25D366', border: '1px solid #1EB85A',
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+                <MessageCircle size={14} /> WhatsApp
+              </button>
+            </a>
           </div>
         </div>
 
-        {/* ══ RIGHT COLUMN ══ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* ── Two-column layout ────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
 
-          {/* Ticket form */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <div style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <MessageCircle size={13} color="var(--txt-2)" />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-1)' }}>Submit a Support Ticket via WhatsApp</span>
+          {/* ── LEFT: Contact info ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Contact card */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--txt-1)', letterSpacing: '-0.01em' }}>
+                  Contact Details
+                </span>
+              </div>
+              <div style={{ padding: '16px' }}>
+
+                {/* Phone */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--txt-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+                    Phone / WhatsApp
+                  </div>
+                  <a href={`tel:${PHONE}`} style={{ display: 'block', fontSize: 16, fontWeight: 800, color: 'var(--txt-1)', textDecoration: 'none', letterSpacing: '-0.01em', marginBottom: 2 }}>
+                    {PHONE}
+                  </a>
+                  <div style={{ fontSize: 12, color: 'var(--txt-3)' }}>Kenya — EAT (UTC +3)</div>
+                </div>
+
+                {/* Email */}
+                <div style={{ marginBottom: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--txt-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+                    Email
+                  </div>
+                  <a href={`mailto:${EMAIL}`} style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)', textDecoration: 'none' }}>
+                    {EMAIL}
+                  </a>
+                </div>
+
+                {/* Hours */}
+                <div style={{ paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--txt-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                    Business Hours
+                  </div>
+                  {[
+                    { day: 'Monday – Friday', hours: '8:00am – 8:00pm' },
+                    { day: 'Saturday',        hours: '9:00am – 6:00pm' },
+                    { day: 'Sunday',          hours: 'Closed' },
+                  ].map(row => (
+                    <div key={row.day} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--txt-2)', fontWeight: 500 }}>{row.day}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: row.hours === 'Closed' ? 'var(--txt-4)' : 'var(--txt-1)' }}>{row.hours}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div style={{ padding: '14px 16px' }}>
-              {submitted ? (
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>✓ WhatsApp opened!</div>
-                  <div style={{ fontSize: 13, color: 'var(--txt-2)', lineHeight: 1.6, marginBottom: 14 }}>
-                    Your ticket message was pre-filled. Just hit Send in WhatsApp and we&apos;ll get back to you within 30 minutes.
-                  </div>
-                  <button onClick={() => setSubmitted(false)} style={{ ...inputStyle, width: 'auto', padding: '6px 16px', cursor: 'pointer', fontWeight: 600 }}>
-                    Submit another ticket
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-2)', display: 'block', marginBottom: 5 }}>Your Name</label>
-                      <input style={inputStyle} placeholder="e.g. John Kamau" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            {/* Response times */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--txt-1)', letterSpacing: '-0.01em' }}>Response Times</span>
+              </div>
+              <div style={{ padding: '4px 0' }}>
+                {[
+                  { icon: MessageCircle, color: '#25D366', label: 'WhatsApp',   time: 'Under 30 min' },
+                  { icon: Phone,         color: 'var(--blue)', label: 'Phone',  time: 'Immediate' },
+                  { icon: Mail,          color: 'var(--primary)', label: 'Email', time: 'Within 4 hours' },
+                ].map(({ icon: Icon, color, label, time }, i, arr) => (
+                  <div key={label} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 16px',
+                    borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 'var(--radius)',
+                      background: 'var(--surface-3)', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Icon size={14} color={color} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-2)', display: 'block', marginBottom: 5 }}>Email (optional)</label>
-                      <input style={inputStyle} placeholder="you@example.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt-1)' }}>{label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--txt-3)' }}>{time}</div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-2)', display: 'block', marginBottom: 5 }}>Category</label>
-                    <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                      {TICKET_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
-                  </div>
+          {/* ── RIGHT: Ticket form + FAQ ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-2)', display: 'block', marginBottom: 5 }}>
-                      Describe your issue <span style={{ color: 'var(--red)' }}>*</span>
-                    </label>
-                    <textarea
-                      style={{ ...inputStyle, resize: 'vertical', minHeight: 110 }}
-                      placeholder="Tell us what's happening. Include any error messages, order numbers, or M-Pesa references if relevant."
-                      value={form.message}
-                      onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                    />
-                  </div>
+            {/* Ticket form */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MessageCircle size={14} color="var(--primary)" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt-1)', letterSpacing: '-0.01em' }}>
+                  Send a Support Ticket
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--txt-3)', marginLeft: 4 }}>— opens WhatsApp with your message pre-filled</span>
+              </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ padding: '20px' }}>
+                {submitted ? (
+                  <div style={{ textAlign: 'center', padding: '32px 20px' }}>
+                    <div style={{
+                      width: 52, height: 52, borderRadius: '50%',
+                      background: 'var(--green-lt)', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      margin: '0 auto 16px',
+                    }}>
+                      <CheckCircle size={24} color="var(--green)" />
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--txt-1)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+                      WhatsApp opened
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--txt-3)', lineHeight: 1.7, maxWidth: 360, margin: '0 auto 20px' }}>
+                      Your ticket was pre-filled in WhatsApp. Just press Send and we will get back to you within 30 minutes during business hours.
+                    </p>
                     <button
-                      onClick={handleSubmit}
-                      disabled={!form.message.trim()}
-                      style={{ padding: '9px 20px', background: form.message.trim() ? '#e6f9ee' : 'var(--surface-2)', border: `1px solid ${form.message.trim() ? '#25D366' : 'var(--border)'}`, color: form.message.trim() ? '#0d6e38' : 'var(--txt-3)', fontWeight: 700, fontSize: 13, cursor: form.message.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'inherit' }}
+                      onClick={() => { setSubmitted(false); setForm({ name: '', email: '', category: 'billing', message: '' }) }}
+                      className="btn"
                     >
-                      <MessageCircle size={14} /> Send via WhatsApp
+                      Submit another ticket
                     </button>
-                    <span style={{ fontSize: 12, color: 'var(--txt-3)' }}>Opens WhatsApp with your ticket pre-filled — just hit send.</span>
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div className="form-row">
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Your Name</label>
+                        <input className="input" style={{ width: '100%' }} placeholder="e.g. John Kamau" value={form.name} onChange={e => set('name', e.target.value)} />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Email <span style={{ color: 'var(--txt-4)', fontWeight: 400 }}>(optional)</span></label>
+                        <input className="input" style={{ width: '100%' }} type="email" placeholder="you@example.com" value={form.email} onChange={e => set('email', e.target.value)} />
+                      </div>
+                    </div>
 
-          {/* FAQ */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <div style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <HelpCircle size={13} color="var(--txt-2)" />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-1)' }}>Frequently Asked Questions</span>
-            </div>
-            <div>
-              {FAQ.map((faq, i) => (
-                <div key={i} style={{ borderBottom: i < FAQ.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <button
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: openFaq === i ? 'var(--surface-2)' : 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontFamily: 'inherit' }}
-                  >
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt-1)' }}>{faq.q}</span>
-                    <span style={{ color: 'var(--xl-green)', flexShrink: 0, fontSize: 16, fontWeight: 700 }}>{openFaq === i ? '−' : '+'}</span>
-                  </button>
-                  {openFaq === i && (
-                    <div style={{ padding: '0 14px 12px 14px', fontSize: 13, color: 'var(--txt-2)', lineHeight: 1.65 }}>{faq.a}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Category</label>
+                      <select className="input" style={{ width: '100%' }} value={form.category} onChange={e => set('category', e.target.value)}>
+                        {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
 
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">
+                        Describe your issue <span style={{ color: 'var(--red)' }}>*</span>
+                      </label>
+                      <textarea
+                        className="input"
+                        style={{ width: '100%', minHeight: 120, resize: 'vertical', borderColor: msgError ? 'var(--red)' : undefined }}
+                        placeholder="Describe what happened. Include any error messages, receipt numbers, or M-Pesa references."
+                        value={form.message}
+                        onChange={e => { set('message', e.target.value); if (e.target.value.trim()) setMsgError(false) }}
+                      />
+                      {msgError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>Please describe your issue before sending.</div>}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 4 }}>
+                      <button
+                        onClick={handleSend}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '0 20px', height: 38,
+                          background: '#25D366', border: '1px solid #1EB85A',
+                          borderRadius: 'var(--radius)', color: '#fff',
+                          fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        <MessageCircle size={14} /> Send via WhatsApp
+                      </button>
+                      <span style={{ fontSize: 12, color: 'var(--txt-3)', lineHeight: 1.5 }}>
+                        Opens WhatsApp — just press Send
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* FAQ */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <HelpCircle size={14} color="var(--primary)" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt-1)', letterSpacing: '-0.01em' }}>
+                  Frequently Asked Questions
+                </span>
+              </div>
+              <div>
+                {FAQ.map((faq, i) => (
+                  <div key={i} style={{ borderBottom: i < FAQ.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <button
+                      onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                      style={{
+                        width: '100%', textAlign: 'left',
+                        padding: '14px 20px',
+                        background: openFaq === i ? 'var(--primary-lt)' : 'transparent',
+                        border: 'none', cursor: 'pointer',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16,
+                        fontFamily: 'inherit', transition: 'background .1s',
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 600, color: openFaq === i ? 'var(--primary-txt)' : 'var(--txt-1)', lineHeight: 1.4 }}>
+                        {faq.q}
+                      </span>
+                      {openFaq === i
+                        ? <ChevronUp size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                        : <ChevronDown size={14} color="var(--txt-3)" style={{ flexShrink: 0 }} />
+                      }
+                    </button>
+                    {openFaq === i && (
+                      <div style={{
+                        padding: '0 20px 16px 20px',
+                        fontSize: 13, color: 'var(--txt-2)', lineHeight: 1.7,
+                        background: 'var(--primary-lt)',
+                      }}>
+                        {faq.a}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

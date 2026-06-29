@@ -55,8 +55,8 @@ export default function SettingsPage() {
     fetch('/api/tenant/logo').then(r => r.json()).then(d => { if (d.logo_url) setLogoUrl(d.logo_url) }).catch(() => {})
   }, [])
 
-  const loadUser = () => {
-    const currentUser = getCurrentAuthUser()
+  const loadUser = async () => {
+    const currentUser = await getCurrentAuthUser()
     setUser(currentUser)
   }
 

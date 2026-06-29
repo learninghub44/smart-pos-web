@@ -2,7 +2,16 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { query, queryOne } from './db'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
+const JWT_SECRET = (() => {
+  const s = process.env.JWT_SECRET
+  if (!s || s.length < 32) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET env var is missing or too short (min 32 chars). Set it in Railway.')
+    }
+    return 'dev-secret-change-in-production-not-safe-12345'
+  }
+  return s
+})()
 const COOKIE_NAME = 'smartpos_token'
 
 export interface TenantUser {
