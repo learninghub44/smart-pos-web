@@ -2,16 +2,22 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { query, queryOne } from './db'
 
-const JWT_SECRET = (() => {
+// Resolved lazily so Next.js build-time page collection doesn't throw.
+// The check runs the first time a token is signed or verified at runtime.
+let _jwtSecret: string | null = null
+function getJwtSecret(): string {
+  if (_jwtSecret) return _jwtSecret
   const s = process.env.JWT_SECRET
   if (!s || s.length < 32) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('JWT_SECRET env var is missing or too short (min 32 chars). Set it in Railway.')
     }
-    return 'dev-secret-change-in-production-not-safe-12345'
+    _jwtSecret = 'dev-secret-change-in-production-not-safe-12345'
+  } else {
+    _jwtSecret = s
   }
-  return s
-})()
+  return _jwtSecret
+}
 const COOKIE_NAME = 'smartpos_token'
 
 export interface TenantUser {
@@ -54,12 +60,12 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload
+    return jwt.verify(token, getJwtSecret()) as JWTPayload
   } catch {
     return null
   }
