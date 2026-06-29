@@ -35,8 +35,9 @@ export async function POST(req: NextRequest) {
     `, [email])
 
     // Constant-time: always verify even when user is null to prevent timing attacks
-    const hash = user?.password_hash || '$2a$12$invalidhashpaddingtomakethiswork123456789012345678'
-    const valid = await verifyPassword(password, hash)
+    const hash = user?.password_hash || '$2a$12$LCKz2tqFfuMzOoKFQMCLZeYoX3kZGZ5Lx8FZkH1mN2oP3qR4sT5uV'
+    let valid = false
+    try { valid = await verifyPassword(password, hash) } catch { valid = false }
 
     if (!user || !valid) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
