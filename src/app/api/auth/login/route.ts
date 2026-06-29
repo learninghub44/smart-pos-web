@@ -1,29 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { verifyPassword, signToken, makeCookie, isTenantActive } from '@/lib/tenant-auth'
-import { isRateLimited, getClientIp } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
-  // Rate limit: max 10 login attempts per IP per 15 minutes
-  const ip = getClientIp(req)
-  if (isRateLimited(`login:${ip}`, 10, 15 * 60 * 1000)) {
-    return NextResponse.json(
-      { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
-      { status: 429 }
-    )
-  }
-
   try {
-    const body = await req.json()
-    const email    = typeof body.email    === 'string' ? body.email.trim().toLowerCase()  : ''
-    const password = typeof body.password === 'string' ? body.password                    : ''
-
+    const { email, password } = await req.json()
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
-    if (email.length > 254 || password.length > 256) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 400 })
-    }
+
+    const emailLower = email.trim().toLowerCase()
 
     const user = await queryOne<any>(`
       SELECT tu.*, t.status as tenant_status, t.plan_id, t.business_name,
@@ -32,15 +18,15 @@ export async function POST(req: NextRequest) {
       JOIN tenants t ON t.id = tu.tenant_id
       LEFT JOIN branches b ON b.id = tu.branch_id
       WHERE tu.email = $1 AND tu.is_active = true
-    `, [email])
+    `, [emailLower])
 
-    // Constant-time: always verify even when user is null to prevent timing attacks
-    const hash = user?.password_hash || '$2a$12$LCKz2tqFfuMzOoKFQMCLZeYoX3kZGZ5Lx8FZkH1mN2oP3qR4sT5uV'
-    let valid = false
-    try { valid = await verifyPassword(password, hash) } catch { valid = false }
+    if (!user) {
+      return NextResponse.json({ error: 'No account found with this email' }, { status: 401 })
+    }
 
-    if (!user || !valid) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+    const valid = await verifyPassword(password, user.password_hash)
+    if (!valid) {
+      return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
     }
 
     const blocked = ['suspended', 'cancelled']
@@ -60,12 +46,7 @@ export async function POST(req: NextRequest) {
       [user.id]
     )
 
-    const token = signToken({
-      userId: user.id,
-      tenantId: user.tenant_id,
-      role: user.role,
-      tenantStatus: user.tenant_status,
-    })
+    const token = signToken({ userId: user.id, tenantId: user.tenant_id, role: user.role, tenantStatus: user.tenant_status })
 
     const response = NextResponse.json({
       success: true,

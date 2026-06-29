@@ -3,15 +3,8 @@ import { query, queryOne } from '@/lib/db'
 import {
   hashPassword, signToken, makeCookie, generateSlug,
 } from '@/lib/tenant-auth'
-import { isRateLimited, getClientIp } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
-  // Rate limit: max 5 registrations per IP per hour
-  const ip = getClientIp(req)
-  if (isRateLimited(`register:${ip}`, 5, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'Too many registration attempts. Please try again later.' }, { status: 429 })
-  }
-
   try {
     const { businessName, email, password, phone, planId } = await req.json()
 
