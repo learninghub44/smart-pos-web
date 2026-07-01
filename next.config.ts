@@ -1,8 +1,7 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  serverExternalPackages: ['pg', 'bcryptjs', 'jsonwebtoken'],
+  serverExternalPackages: ['bcryptjs', 'jsonwebtoken'],
 
   // ── Security headers ──────────────────────────────────────────
   async headers() {
