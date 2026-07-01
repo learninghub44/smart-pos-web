@@ -1,5 +1,4 @@
 // Tenant-aware auth client — uses JWT cookie via /api/auth/*
-// Replaces the old Supabase-based auth
 
 export interface User {
   id: string

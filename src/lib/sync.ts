@@ -80,9 +80,6 @@ export async function syncToServer() {
   }
 }
 
-// Keep old name as alias
-export const syncToSupabase = syncToServer
-
 async function upsertLocalRecords<T extends { id: string }>(
   localGetAll: () => Promise<T[]>,
   localAdd: (item: T) => Promise<any>,
@@ -122,13 +119,11 @@ export async function syncFromServer() {
   }
 }
 
-export const syncFromSupabase = syncFromServer
-
 export async function fullSync() {
   console.log('Starting full sync...')
   const toServer = await syncToServer()
   const fromServer = await syncFromServer()
-  return { toSupabase: toServer, fromSupabase: fromServer }
+  return { toServer, fromServer }
 }
 
 export function setupAutoSync() {

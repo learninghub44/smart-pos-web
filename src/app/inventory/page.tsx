@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { 
   getAllProducts, addProductToDB, updateProductInDB, 
-  deleteProductFromDB, getProductByBarcode, syncProductsFromSupabase,
+  deleteProductFromDB, getProductByBarcode, syncProductsFromServer,
   getAllCategories, addCategoryToDB, getAllBrands, addBrandToDB, getAllSuppliers
 } from '@/lib/indexeddb'
 import BarcodeScanner from '@/components/BarcodeScanner'
@@ -211,7 +211,7 @@ export default function InventoryPage() {
         const data = json.data ?? json
         if (Array.isArray(data)) {
           setProducts(data)
-          await syncProductsFromSupabase(data)
+          await syncProductsFromServer(data)
           return
         }
       }
@@ -346,7 +346,7 @@ export default function InventoryPage() {
 
     // Add denormalized text brand/category (some installs have these as legacy
     // text columns alongside the _id columns). We'll try with them and retry
-    // without if Supabase rejects.
+    // without if the API rejects.
     const productDataWithMeta = {
       ...productData,
       brand: selectedBrand?.name || null,
@@ -386,7 +386,7 @@ export default function InventoryPage() {
         await updateProductInDB({ ...productDataWithMeta, id: editingProduct.id, created_at: editingProduct.created_at })
       }
     } catch (err: any) {
-      console.error('Supabase save failed, using IndexedDB:', err?.message)
+      console.error('Server save failed, using IndexedDB:', err?.message)
       // Offline fallback
       if (editingProduct) {
         await updateProductInDB({ ...productDataWithMeta, id: editingProduct.id, created_at: editingProduct.created_at })

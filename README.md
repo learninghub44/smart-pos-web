@@ -1,197 +1,137 @@
-# SMART POS Web System
+# Smart POS
 
-A modern, offline-first Point of Sale system designed for Kenyan shops. Built with Next.js, Supabase, and Tailwind CSS.
+A multi-tenant, offline-first Point of Sale system for Kenyan retail businesses. Built with Next.js, Neon Postgres, and Tailwind CSS, and deployed on Cloudflare Workers.
+
+## Overview
+
+Smart POS is a SaaS point-of-sale platform: each tenant (shop) gets its own branded workspace, staff accounts, branches, and billing subscription, while running on shared infrastructure. The app is designed to keep working at the till even when the internet drops — sales are queued locally and synced automatically once connectivity returns.
 
 ## Features
 
-- **🛒 Complete POS System**: Product search, cart management, and checkout
-- **📦 Inventory Management**: Add, edit, delete products with stock tracking
-- **🧾 Receipt System**: Thermal printer support with unique receipt PIN verification
-- **🔳 Barcode Scanning**: Support for USB scanners and camera-based scanning
-- **💳 Payment Tracking**: Cash, M-Pesa, and mixed payment methods
-- **📊 Dashboard**: Sales analytics, revenue tracking, and low stock alerts
-- **📶 Offline-First**: Works without internet, syncs when connection is restored
-- **🔐 Role-Based Access**: Admin and cashier roles with secure authentication
-- **🖨️ Thermal Printing**: Optimized for 58mm and 80mm thermal printers
+- **Point of Sale** — fast product search, cart management, and checkout with barcode scanning (USB scanner or device camera)
+- **Multi-branch support** — manage inventory and sales across multiple shop locations under one tenant
+- **Inventory management** — products, categories, brands, suppliers, stock counts, and low-stock alerts
+- **Sales & returns** — full sales history, receipt lookup by PIN, and an approval-based returns workflow
+- **Payments** — cash, M-Pesa, card, bank transfer, and mixed/split payments
+- **Billing** — subscription plans and payments via Paystack, with KES pricing tiers
+- **Reporting** — dashboard analytics, revenue and stock reports
+- **Offline-first** — IndexedDB-backed local cache; the app keeps working without a connection and syncs when it's back
+- **Role-based access** — tenant admin, cashier, and platform super-admin roles, enforced at the middleware layer
+- **Thermal receipt printing** — tuned for 58mm and 80mm printers
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS
-- **Backend**: Supabase (PostgreSQL, Auth, RLS)
-- **Offline Storage**: IndexedDB
-- **Deployment**: Vercel
-- **Icons**: Lucide React
-- **Charts**: Recharts
-- **Printing**: react-to-print
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router, TypeScript) |
+| Styling | Tailwind CSS |
+| Database | [Neon](https://neon.tech) (serverless Postgres) via `@neondatabase/serverless` |
+| Auth | JWT cookies (`jsonwebtoken` server-side, Web Crypto in middleware) + `bcryptjs` |
+| Offline storage | IndexedDB (via `idb`) |
+| Payments | Paystack |
+| Hosting | Cloudflare Workers, via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) |
+| Icons | Lucide React |
+| Printing | `react-to-print` |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ installed
-- Supabase account (free tier works)
-- Git
+- Node.js 20+
+- A [Neon](https://neon.tech) Postgres database (free tier is sufficient to start)
+- A Paystack account for billing (test keys work for local development)
 
 ### Installation
 
-1. Clone the repository:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/learninghub44/smart-pos-web.git
 cd smart-pos-web
-```
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-3. Set up Supabase:
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Go to SQL Editor in Supabase dashboard
-   - Run the SQL schema from `supabase/schema.sql`
+### Configure environment variables
 
-4. Configure environment variables:
-   - Copy `.env.local.example` to `.env.local`
-   - Add your Supabase credentials:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   NEXT_PUBLIC_APP_NAME=SMART POS
-   NEXT_PUBLIC_SHOP_NAME=Your Shop Name
-   ```
+Copy the example file and fill in your own values:
 
-5. Run the development server:
+```bash
+cp .env.example .env
+```
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Neon pooled connection string (Dashboard → Connection Details → Pooled connection) |
+| `JWT_SECRET` | Random 64-char string — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+| `PAYSTACK_SECRET_KEY` | Paystack secret key (`sk_test_...` for development, `sk_live_...` in production) |
+| `NODE_ENV` | `development` locally, `production` when deployed |
+
+### Set up the database
+
+In the Neon console's SQL Editor, run `database/migrations/FULL_MIGRATION.sql`. This single script creates the full schema on a fresh database — you don't need to run `database/schema.sql` or the individual migration files separately (those are kept for reference/history).
+
+### Run locally
+
 ```bash
 npm run dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser
+Open [http://localhost:3000](http://localhost:3000).
 
-## Demo Credentials
+## Project Structure
 
-The system comes with demo credentials for testing:
-
-- **Admin**: admin@smartpos.com / admin123
-- **Cashier**: cashier@smartpos.com / cashier123
-
-## Usage
-
-### First Time Setup
-
-1. Login with admin credentials
-2. Go to Inventory page
-3. Click "Seed Sample Data" to add sample products
-4. Start using the POS system
-
-### Making a Sale
-
-1. Go to POS page
-2. Search products by name or scan barcode
-3. Add items to cart
-4. Click Checkout
-5. Select payment method (Cash, M-Pesa, or Mixed)
-6. Complete sale and print receipt
-
-### Managing Inventory
-
-1. Go to Inventory page
-2. Add new products with name, barcode, prices, and stock
-3. Edit existing products
-4. Delete products
-5. Monitor low stock alerts
-
-### Verifying Receipts
-
-1. Go to Receipts page
-2. Enter the Receipt PIN
-3. View receipt details
-4. Print if needed for returns/exchanges
-
-## Database Schema
-
-The system uses the following tables:
-
-- `users`: User accounts with roles (admin/cashier)
-- `products`: Product inventory with pricing and stock
-- `sales`: Sales transactions with receipt PINs
-- `sale_items`: Individual items in each sale
-- `inventory_logs`: Stock change history
-- `offline_queue`: Queued actions for offline sync
-
-## Offline Functionality
-
-The system works offline using IndexedDB:
-
-- All products cached locally
-- Sales queued when offline
-- Automatic sync when internet returns
-- No data loss during disconnection
+```
+src/
+  app/            # Routes (App Router) — pages + /api handlers
+  components/      # Shared UI components
+  hooks/           # Custom React hooks
+  lib/             # DB client, auth, sync, business logic
+  middleware.ts    # Tenant auth, route protection, subscription gating
+database/
+  schema.sql            # Base schema
+  migrations/            # Incremental migrations (historical)
+  migrations/FULL_MIGRATION.sql   # Consolidated schema for a fresh database
+```
 
 ## Deployment
 
-### Vercel Deployment
+The app deploys to Cloudflare Workers using OpenNext's Cloudflare adapter.
 
-1. Push code to GitHub
-2. Import project in Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy
+```bash
+npm run cf:build     # Build the Next.js app and transform it for Workers
+npm run cf:preview   # Build and run locally against the real Workers runtime
+npm run cf:deploy    # Build and deploy
+```
 
-### Environment Variables Required
+Before deploying, set the required secrets in Cloudflare:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_APP_NAME` (optional)
-- `NEXT_PUBLIC_SHOP_NAME` (optional)
+```bash
+npx wrangler secret put DATABASE_URL
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put PAYSTACK_SECRET_KEY
+```
 
-## Thermal Printer Setup
+Configuration lives in `wrangler.jsonc` and `open-next.config.ts`.
 
-The system supports thermal printers:
+> **Next.js version note:** this project is pinned to Next.js 15.5.x rather than 16.x. Next 16 renamed Middleware to "Proxy" and made it Node.js-runtime-only with no Edge option, which `@opennextjs/cloudflare` doesn't yet support (tracked upstream: [opennextjs-cloudflare#962](https://github.com/opennextjs/opennextjs-cloudflare/issues/962)). Revisit this pin once that lands.
 
-- 58mm thermal printers
-- 80mm thermal printers (recommended)
-- Browser print dialog
-- ESC/POS compatible
+## Offline Behavior
+
+Products, categories, and other reference data are cached in IndexedDB. Sales made while offline are queued and automatically synced once the connection is restored — nothing is lost, and no special action is needed from the cashier.
 
 ## Security
 
-- Supabase Row Level Security (RLS) enabled
-- Role-based access control
-- Secure authentication
-- Data encryption in transit
-
-## Performance Goals
-
-- POS loads < 2 seconds
-- Works on low-end phones
-- Offline fully functional
-- Fast checkout (<2 seconds)
-- Reliable thermal printing
+- JWT-based session cookies, verified in middleware using the Web Crypto API
+- Role-based access control (tenant admin / cashier / platform super-admin)
+- Tenant isolation enforced at the API layer
+- Subscription status (active / pending payment / suspended / cancelled) gates access to the app outside of billing and auth routes
 
 ## Troubleshooting
 
-### Barcode Scanner Not Working
-- Ensure USB scanner is properly connected
-- Check if scanner is in keyboard mode
-- Try the manual barcode input option
+**Barcode scanner not detected** — confirm the USB scanner is in keyboard-wedge mode, or use the manual barcode entry field.
 
-### Offline Sync Issues
-- Check internet connection
-- Verify Supabase credentials
-- Check browser console for errors
+**Products not syncing / stale data** — check the network connection, then use Settings → Force Sync from Server to clear the local cache and re-pull from the API.
 
-### Printing Issues
-- Ensure printer is connected
-- Check browser print settings
-- Try different paper size (58mm/80mm)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+**Printing issues** — confirm the printer is connected and selected in the browser's print dialog; try switching between 58mm and 80mm layouts.
 
 ## License
 
-This project is licensed under the MIT License.
-
-## Support
-
-For issues and questions, please open an issue on GitHub.
+MIT

@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════
 -- Smart POS  ·  SaaS Multi-Tenant Migration
--- Run once against your Railway Postgres database
+-- Run once against your Neon Postgres database
 -- ═══════════════════════════════════════════════════════════════
 
 -- Extensions

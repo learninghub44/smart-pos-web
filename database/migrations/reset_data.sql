@@ -1,6 +1,6 @@
 -- ============================================
 -- SMART POS — Full Data Reset (keep structure)
--- Run in Supabase SQL Editor
+-- Run in Neon's SQL Editor
 -- ============================================
 
 -- Disable triggers temporarily to avoid FK issues

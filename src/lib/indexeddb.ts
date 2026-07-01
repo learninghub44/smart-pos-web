@@ -682,22 +682,22 @@ export async function clearCurrentUser() {
   return db.clear('users')
 }
 
-// Sync IndexedDB to exactly match a list of products from Supabase
-// Removes products that no longer exist in Supabase
-export async function syncProductsFromSupabase(supabaseProducts: any[]) {
+// Sync IndexedDB to exactly match a list of products from the server
+// Removes products that no longer exist on the server
+export async function syncProductsFromServer(serverProducts: any[]) {
   const db = await getDB()
   const localProducts = await db.getAll('products')
-  const supabaseIds = new Set(supabaseProducts.map(p => p.id))
+  const serverIds = new Set(serverProducts.map(p => p.id))
 
-  // Delete products that are in IndexedDB but not in Supabase
+  // Delete products that are in IndexedDB but not on the server
   for (const local of localProducts) {
-    if (!supabaseIds.has(local.id)) {
+    if (!serverIds.has(local.id)) {
       await db.delete('products', local.id)
     }
   }
 
-  // Upsert all Supabase products
-  for (const p of supabaseProducts) {
+  // Upsert all server products
+  for (const p of serverProducts) {
     await db.put('products', p)
   }
 }

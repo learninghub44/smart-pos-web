@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
--- Smart POS  ·  FULL MIGRATION  (run once on fresh Railway DB)
+-- Smart POS  ·  FULL MIGRATION  (run once on a fresh Neon database)
 -- ═══════════════════════════════════════════════════════════════
 
 -- Extensions

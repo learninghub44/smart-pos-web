@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────
 -- Migration 001: Multi-branch support
--- Run this in your Supabase SQL editor
+-- Run this in your Neon SQL editor
 -- ─────────────────────────────────────────────
 
 -- 1. Branches table

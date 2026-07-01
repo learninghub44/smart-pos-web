@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────
 -- Migration 002: Supplier details, product-supplier link, payment methods
--- Run this in your Supabase SQL editor
+-- Run this in your Neon SQL editor
 -- ─────────────────────────────────────────────
 
 -- 1. Extra supplier detail fields

@@ -136,7 +136,7 @@ export default function SettingsPage() {
     }
   }
 
-  // Persist the full payment methods array to Supabase + IndexedDB
+  // Persist the full payment methods array to the server + IndexedDB
   const savePaymentMethods = async (methods: any[]) => {
     setPaymentMethods(methods)
     const now = new Date().toISOString()
@@ -253,7 +253,7 @@ export default function SettingsPage() {
         await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'receipt', value: receiptSettings }) })
         await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: 'tax', value: taxSettings }) })
       } catch (error) {
-        console.log('Supabase sync failed, settings saved locally')
+        console.log('Server sync failed, settings saved locally')
       }
       
       alert('Settings saved successfully!')
@@ -643,7 +643,7 @@ export default function SettingsPage() {
                   <div>
                     <p className="font-semibold text-red-700 text-sm">Force Sync from Server</p>
                     <p className="muted" style={{fontSize:11}}>
-                      Clears local cache and reloads all products fresh from Supabase.
+                      Clears local cache and reloads all products fresh from the server.
                       Use this if products are not showing or showing deleted items.
                     </p>
                   </div>

@@ -1,5 +1,5 @@
 -- Super Admins table for the internal admin panel
--- Run this once in your Supabase SQL editor
+-- Run this once in your Neon SQL editor
 
 CREATE TABLE IF NOT EXISTS super_admins (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

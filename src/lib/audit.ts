@@ -23,7 +23,7 @@ export async function logAuditEvent(params: {
       created_at: new Date().toISOString()
     }
 
-    // Save to Railway API
+    // Save via the audit-logs API
     try {
       await fetch('/api/audit-logs', {
         method: 'POST',
