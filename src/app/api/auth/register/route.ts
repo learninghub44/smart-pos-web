@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db'
 import {
   hashPassword, signToken, makeCookie, generateSlug,
 } from '@/lib/tenant-auth'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,15 @@ export async function POST(req: NextRequest) {
     }
 
     const emailLower = email.trim().toLowerCase()
+    const ip = getClientIp(req)
+
+    // Prevents automated bulk account creation / tenant-table spam.
+    const limited = await checkRateLimit([
+      { key: `register:ip:${ip}`, maxHits: 5, windowMs: 60 * 60 * 1000 },
+    ])
+    if (limited) {
+      return NextResponse.json({ error: 'Too many signups from this location. Please try again later.' }, { status: 429 })
+    }
     const plan = planId || 'starter'
 
     // Check email not already taken

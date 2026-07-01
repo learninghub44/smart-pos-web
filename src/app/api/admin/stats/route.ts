@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
-import { verifyToken } from '@/lib/tenant-auth'
-
-function getAdminToken(req: NextRequest): string | null {
-  const cookie = req.headers.get('cookie') || ''
-  const match = cookie.split(';').find(c => c.trim().startsWith('smartpos_admin='))
-  return match ? match.split('=')[1]?.trim() : null
-}
-
-async function verifyAdmin(req: NextRequest) {
-  const token = getAdminToken(req)
-  if (!token) return null
-  const payload = verifyToken(token)
-  if (!payload || payload.role !== 'super_admin') return null
-  return payload
-}
+import { verifyAdmin } from '@/lib/admin-auth'
 
 export async function GET(req: NextRequest) {
   const admin = await verifyAdmin(req)

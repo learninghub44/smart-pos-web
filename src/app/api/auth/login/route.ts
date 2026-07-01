@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
-import { verifyPassword, signToken, makeCookie, isTenantActive } from '@/lib/tenant-auth'
+import { verifyPassword, signToken, makeCookie, isTenantActive, DUMMY_HASH } from '@/lib/tenant-auth'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +11,18 @@ export async function POST(req: NextRequest) {
     }
 
     const emailLower = email.trim().toLowerCase()
+    const ip = getClientIp(req)
+
+    // Rate limit by IP AND by email separately — IP limit stops a single
+    // attacker hammering many accounts, email limit stops distributed
+    // attempts (botnet) against one account.
+    const limited = await checkRateLimit([
+      { key: `login:ip:${ip}`, maxHits: 20, windowMs: 15 * 60 * 1000 },
+      { key: `login:email:${emailLower}`, maxHits: 8, windowMs: 15 * 60 * 1000 },
+    ])
+    if (limited) {
+      return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 })
+    }
 
     const user = await queryOne<any>(`
       SELECT tu.*, t.status as tenant_status, t.plan_id, t.business_name,
@@ -20,13 +33,14 @@ export async function POST(req: NextRequest) {
       WHERE tu.email = $1 AND tu.is_active = true
     `, [emailLower])
 
-    if (!user) {
-      return NextResponse.json({ error: 'No account found with this email' }, { status: 401 })
-    }
+    // Always run bcrypt.compare — against the real hash if the user exists,
+    // against a fixed dummy hash if not — so response time doesn't reveal
+    // whether an email is registered. Both branches must genuinely await
+    // verifyPassword; do not short-circuit before it.
+    const valid = await verifyPassword(password, user?.password_hash || DUMMY_HASH)
 
-    const valid = await verifyPassword(password, user.password_hash)
-    if (!valid) {
-      return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
+    if (!user || !valid) {
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
     const blocked = ['suspended', 'cancelled']

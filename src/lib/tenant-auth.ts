@@ -2,8 +2,24 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { query, queryOne } from './db'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
+// No fallback, on purpose: a hardcoded default secret would let anyone who
+// reads this (public) repo forge valid session tokens — including
+// super_admin tokens — for any deployment that forgot to set the real one.
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET is not set. Set it via `wrangler secret put JWT_SECRET` (prod) ' +
+    'or in .env.local (dev). Refusing to start with an insecure default.'
+  )
+}
+const JWT_SECRET = process.env.JWT_SECRET
 const COOKIE_NAME = 'smartpos_token'
+
+// Precomputed bcrypt hash of a value nobody will ever type, used to keep
+// login response time constant when no matching user is found — otherwise
+// the endpoint leaks which emails are registered via response timing
+// (bcrypt.compare takes ~50-100ms; skipping it for unknown emails makes
+// that branch measurably faster).
+export const DUMMY_HASH = '$2b$12$L14L7xt1PjtHol/j.KUIcukIXzP6Z3dBTyQZihlteqU0lMkuv0gpm'
 
 export interface TenantUser {
   id: string

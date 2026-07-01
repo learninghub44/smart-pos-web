@@ -43,7 +43,16 @@ async function verifyJwt(token: string, secret: string): Promise<Record<string, 
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const secret = process.env.JWT_SECRET || 'dev-secret-change-in-production'
+  const secret = process.env.JWT_SECRET
+
+  // No fallback: a hardcoded default here would let anyone reading this
+  // public repo forge valid tokens for any deployment that forgot to set
+  // the real secret. Public paths still pass through below (no point
+  // breaking the login page itself), but anything requiring a verified
+  // token fails closed instead of silently trusting a known-to-everyone key.
+  if (!secret) {
+    console.error('JWT_SECRET is not set — rejecting all authenticated requests.')
+  }
 
   // ── 1. Super-admin pages ──────────────────────────────────────
   const isAdminPage =
@@ -57,7 +66,7 @@ export async function middleware(req: NextRequest) {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       return NextResponse.redirect(new URL('/admin', req.url))
     }
-    const payload = await verifyJwt(adminToken, secret)
+    const payload = secret ? await verifyJwt(adminToken, secret) : null
     if (!payload || payload.role !== 'super_admin') {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       return NextResponse.redirect(new URL('/admin', req.url))
@@ -77,7 +86,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  const payload = await verifyJwt(cookie, secret)
+  const payload = secret ? await verifyJwt(cookie, secret) : null
   if (!payload) {
     const res = pathname.startsWith('/api/')
       ? NextResponse.json({ error: 'Session expired' }, { status: 401 })
@@ -104,12 +113,17 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Pass tenant context to API routes via headers
-  const res = NextResponse.next()
-  if (payload.tenantId) res.headers.set('x-tenant-id', payload.tenantId as string)
-  if (payload.userId)   res.headers.set('x-user-id', payload.userId as string)
-  if (payload.role)     res.headers.set('x-user-role', payload.role as string)
-  return res
+  // NOTE: tenant/user context is intentionally NOT forwarded via headers
+  // here. `res.headers.set(...)` on a NextResponse.next() result sets
+  // headers on the outgoing response to the browser, not on the request
+  // reaching the route handler — so a previous version of this code was
+  // both a no-op (nothing read those headers) and an info leak (it exposed
+  // tenant_id/user_id/role in every response). Every API route re-verifies
+  // the session from the cookie itself (see requireAuth in api-helper.ts),
+  // which is also the safer pattern: route handlers should never trust
+  // headers that could, on a misconfigured deploy, be reachable without
+  // passing through this middleware.
+  return NextResponse.next()
 }
 
 export const config = {
