@@ -2,6 +2,8 @@
 
 A multi-tenant, offline-first Point of Sale system for Kenyan retail businesses. Built with Next.js, Neon Postgres, and Tailwind CSS, and deployed on Cloudflare Workers.
 
+**This is proprietary software.** See [LICENSE](./LICENSE) — no use, copy, or redistribution is permitted without written authorization from Zetu Business Solutions.
+
 ## Overview
 
 Smart POS is a SaaS point-of-sale platform: each tenant (shop) gets its own branded workspace, staff accounts, branches, and billing subscription, while running on shared infrastructure. The app is designed to keep working at the till even when the internet drops — sales are queued locally and synced automatically once connectivity returns.
@@ -35,6 +37,8 @@ Smart POS is a SaaS point-of-sale platform: each tenant (shop) gets its own bran
 
 ## Getting Started
 
+Access to this repository does not itself grant permission to run, deploy, or use this software — see [License](#license). The steps below are for authorized development only.
+
 ### Prerequisites
 
 - Node.js 20+
@@ -60,13 +64,13 @@ cp .env.example .env
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Neon pooled connection string (Dashboard → Connection Details → Pooled connection) |
-| `JWT_SECRET` | Random 64-char string — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+| `JWT_SECRET` | Random 64-char string — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`. **Required** — the app refuses to sign or verify sessions without it; there is no fallback. |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (`sk_test_...` for development, `sk_live_...` in production) |
 | `NODE_ENV` | `development` locally, `production` when deployed |
 
 ### Set up the database
 
-In the Neon console's SQL Editor, run `database/migrations/FULL_MIGRATION.sql`. This single script creates the full schema on a fresh database — you don't need to run `database/schema.sql` or the individual migration files separately (those are kept for reference/history).
+In the Neon console's SQL Editor, run `database/migrations/FULL_MIGRATION.sql`. This single script creates the full schema on a fresh database — you don't need to run `database/schema.sql` or the individual migration files separately (those are kept for reference/history). The rate-limiting table (`rate_limit_hits`) is created automatically on first use and needs no manual step.
 
 ### Run locally
 
@@ -83,7 +87,7 @@ src/
   app/            # Routes (App Router) — pages + /api handlers
   components/      # Shared UI components
   hooks/           # Custom React hooks
-  lib/             # DB client, auth, sync, business logic
+  lib/             # DB client, auth, rate limiting, sync, business logic
   middleware.ts    # Tenant auth, route protection, subscription gating
 database/
   schema.sql            # Base schema
@@ -119,10 +123,15 @@ Products, categories, and other reference data are cached in IndexedDB. Sales ma
 
 ## Security
 
-- JWT-based session cookies, verified in middleware using the Web Crypto API
-- Role-based access control (tenant admin / cashier / platform super-admin)
-- Tenant isolation enforced at the API layer
-- Subscription status (active / pending payment / suspended / cancelled) gates access to the app outside of billing and auth routes
+- **No hardcoded fallback secrets.** `JWT_SECRET` must be set explicitly — the app throws on startup (server code) or fails closed on every protected request (middleware) rather than silently trusting a default value.
+- **Rate limiting on all auth endpoints** (login, admin login, register), keyed by IP and by email/account, backed by Postgres so limits hold across every Cloudflare Workers isolate — not an in-memory counter that resets per-instance.
+- **Timing-safe credential checks.** Login always runs a full `bcrypt.compare`, including for unregistered emails (against a fixed dummy hash), so response time can't be used to enumerate accounts.
+- JWT-based session cookies, verified in middleware using the Web Crypto API (Edge-compatible) and independently re-verified per request at the API layer — route handlers never trust middleware-set request state for authorization.
+- Role-based access control (tenant admin / cashier / platform super-admin), with tenant and admin sessions on separate signed cookies.
+- Tenant isolation enforced at the API layer on every query, not inferred from client-supplied identifiers.
+- Subscription status (active / pending payment / suspended / cancelled) gates access to the app outside of billing and auth routes.
+
+Found a security issue? Report it privately to Zetu Business Solutions rather than opening a public issue.
 
 ## Troubleshooting
 
@@ -134,4 +143,4 @@ Products, categories, and other reference data are cached in IndexedDB. Sales ma
 
 ## License
 
-MIT
+Proprietary. All rights reserved by Zetu Business Solutions. No permission is granted to use, copy, modify, or distribute this software without prior written consent. See [LICENSE](./LICENSE) for the full terms.
