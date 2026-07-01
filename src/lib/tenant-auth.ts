@@ -5,13 +5,22 @@ import { query, queryOne } from './db'
 // No fallback, on purpose: a hardcoded default secret would let anyone who
 // reads this (public) repo forge valid session tokens — including
 // super_admin tokens — for any deployment that forgot to set the real one.
-if (!process.env.JWT_SECRET) {
-  throw new Error(
-    'JWT_SECRET is not set. Set it via `wrangler secret put JWT_SECRET` (prod) ' +
-    'or in .env.local (dev). Refusing to start with an insecure default.'
-  )
+//
+// Read lazily (inside a function), NOT at module scope. On Cloudflare
+// Workers, process.env is only populated inside a request's execution
+// context — a module-scope read (or throw) runs once at cold start,
+// before that context exists, permanently breaking every route that
+// imports this module for the lifetime of that isolate.
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error(
+      'JWT_SECRET is not set. Set it via `wrangler secret put JWT_SECRET` (prod) ' +
+      'or in .env.local (dev). Refusing to start with an insecure default.'
+    )
+  }
+  return secret
 }
-const JWT_SECRET = process.env.JWT_SECRET
 const COOKIE_NAME = 'smartpos_token'
 
 // Precomputed bcrypt hash of a value nobody will ever type, used to keep
@@ -61,12 +70,12 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload
+    return jwt.verify(token, getJwtSecret()) as JWTPayload
   } catch {
     return null
   }

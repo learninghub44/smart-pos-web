@@ -58,7 +58,7 @@ export default function AdminDashboard() {
     brand: { fontSize: '0.95rem', fontWeight: 800, color: '#f1f5f9' },
     brandSub: { fontSize: '0.72rem', color: '#64748b', marginLeft: 4 },
     navLinks: { display: 'flex', gap: '0.25rem' },
-    navBtn: { padding: '0.4rem 0.875rem', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 },
+    navBtn: { padding: '0.4rem 0.875rem', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 },
     logoutBtn: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', borderRadius: 8, padding: '0.4rem 0.875rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 },
     body: { padding: '2rem 1.5rem', maxWidth: 1200, margin: '0 auto' },
     pageTitle: { fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.35rem' },

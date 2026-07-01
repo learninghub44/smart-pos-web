@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const parsedTotal = parseFloat(total_amount)
   if (isNaN(parsedTotal) || parsedTotal < 0) return err('Invalid total amount')
 
-  const client = await pool.connect()
+  const client = await pool().connect()
   try {
     await client.query('BEGIN')
 

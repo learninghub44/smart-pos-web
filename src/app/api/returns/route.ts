@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const qty = parseInt(quantity)
   if (isNaN(qty) || qty < 1) return err('Invalid quantity')
 
-  const client = await pool.connect()
+  const client = await pool().connect()
   try {
     await client.query('BEGIN')
 

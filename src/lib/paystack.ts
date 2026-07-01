@@ -1,14 +1,26 @@
 // Paystack integration — subscriptions + one-time charges
 // Docs: https://paystack.com/docs/api
 
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!
 const BASE = 'https://api.paystack.co'
+
+// Lazy, request-time read — see db.ts / tenant-auth.ts for why this can't
+// be a module-scope const on Cloudflare Workers.
+function getPaystackSecret(): string {
+  const secret = process.env.PAYSTACK_SECRET_KEY
+  if (!secret) {
+    throw new Error(
+      'PAYSTACK_SECRET_KEY is not set. Set it via `wrangler secret put PAYSTACK_SECRET_KEY` (prod) ' +
+      'or in .env.local (dev).'
+    )
+  }
+  return secret
+}
 
 async function paystackRequest(method: string, path: string, body?: object) {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET}`,
+      Authorization: `Bearer ${getPaystackSecret()}`,
       'Content-Type': 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -80,7 +92,7 @@ import crypto from 'crypto'
 
 export function validateWebhook(rawBody: string, signature: string): boolean {
   const hash = crypto
-    .createHmac('sha512', PAYSTACK_SECRET)
+    .createHmac('sha512', getPaystackSecret())
     .update(rawBody)
     .digest('hex')
   return hash === signature
